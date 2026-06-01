@@ -1,0 +1,15 @@
+layout {
+    tab name="dev" {
+        pane split_direction="vertical" {
+            pane {
+                command "bash"
+            }
+            pane size="35%" {
+                cwd "."
+                command "C:\\Program Files\\nodejs\\node.exe"
+                args "bin\\scratch-ai.js"
+                start_suspended true
+            }
+        }
+    }
+}

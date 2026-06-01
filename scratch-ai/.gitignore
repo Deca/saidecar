@@ -1,0 +1,7 @@
+.env
+node_modules/
+npm-debug.log*
+.tmp-logs/
+logs/
+dev-brain/
+*.jsonl

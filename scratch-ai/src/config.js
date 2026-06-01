@@ -1,0 +1,69 @@
+import os from "node:os";
+import path from "node:path";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+function expandHome(inputPath) {
+  if (!inputPath) {
+    return inputPath;
+  }
+
+  if (inputPath === "~") {
+    return os.homedir();
+  }
+
+  if (inputPath.startsWith("~/") || inputPath.startsWith("~\\")) {
+    return path.join(os.homedir(), inputPath.slice(2));
+  }
+
+  return inputPath;
+}
+
+function defaultIndexPath(logDir) {
+  return path.join(path.dirname(logDir), "scratch-ai.sqlite");
+}
+
+export const config = {
+  apiKey: process.env.OPENAI_API_KEY,
+  backend: (process.env.SCRATCH_AI_BACKEND || "openai").toLowerCase(),
+  defaultModel: process.env.SCRATCH_AI_MODEL || "gpt-5.4-mini",
+  thinkModel:
+    process.env.SCRATCH_AI_THINK_MODEL ||
+    process.env.SCRATCH_AI_MODEL ||
+    "gpt-5.4-mini",
+  codexCommand: process.env.SCRATCH_AI_CODEX_COMMAND || "codex",
+  codexTimeoutMs: Number.parseInt(
+    process.env.SCRATCH_AI_CODEX_TIMEOUT_MS || "120000",
+    10
+  ),
+  codexSearchModel: process.env.SCRATCH_AI_CODEX_SEARCH_MODEL,
+  codexSearchBaseUrl:
+    process.env.SCRATCH_AI_CODEX_SEARCH_BASE_URL ||
+    "https://chatgpt.com/backend-api",
+  codexSearchContextSize:
+    process.env.SCRATCH_AI_CODEX_SEARCH_CONTEXT_SIZE || "medium",
+  logDir: expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"),
+  indexPath: expandHome(
+    process.env.SCRATCH_AI_INDEX_PATH ||
+      defaultIndexPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"))
+  ),
+  project: process.env.SCRATCH_AI_PROJECT || "general",
+  timezone: process.env.SCRATCH_AI_TIMEZONE || "Europe/Rome",
+};
+
+export function validateConfig() {
+  if (!["openai", "codex"].includes(config.backend)) {
+    throw new Error('SCRATCH_AI_BACKEND must be either "openai" or "codex".');
+  }
+
+  if (config.backend === "openai" && !config.apiKey) {
+    throw new Error(
+      "Missing OPENAI_API_KEY. Add it to your environment or create .env from .env.example."
+    );
+  }
+
+  if (!Number.isFinite(config.codexTimeoutMs) || config.codexTimeoutMs < 1000) {
+    throw new Error("SCRATCH_AI_CODEX_TIMEOUT_MS must be at least 1000.");
+  }
+}

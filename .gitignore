@@ -1,0 +1,10 @@
+scratch-ai/.env
+scratch-ai/node_modules/
+scratch-ai/npm-debug.log*
+scratch-ai/.tmp-logs/
+scratch-ai/logs/
+scratch-ai/dev-brain/
+scratch-ai/*.jsonl
+scratch-ai/*.sqlite
+scratch-ai/*.sqlite-*
+scratch-ai/research/

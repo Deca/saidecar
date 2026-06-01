@@ -1,0 +1,14 @@
+{
+  "name": "ai-sidecar-workspace",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix scratch-ai start",
+    "logs": "npm --prefix scratch-ai run logs",
+    "check": "npm --prefix scratch-ai run check",
+    "test": "npm --prefix scratch-ai test",
+    "zellij:pane": "npm --prefix scratch-ai run zellij:pane",
+    "zellij:session": "npm --prefix scratch-ai run zellij:session",
+    "zellij:layout": "npm --prefix scratch-ai run zellij:layout",
+    "zellij:dev": "npm --prefix scratch-ai run zellij:dev"
+  }
+}
