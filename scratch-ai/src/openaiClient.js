@@ -2,16 +2,17 @@ import OpenAI from "openai";
 import { config } from "./config.js";
 import { modes } from "./modes.js";
 import { systemPrompt } from "./prompt.js";
+import { buildQuestionWithContext } from "./sessionContext.js";
 
 function createClient() {
   return new OpenAI({ apiKey: config.apiKey });
 }
 
-function buildRequest({ question, mode }) {
+function buildRequest({ question, mode, sessionContext }) {
   const request = {
     model: mode.model,
     instructions: systemPrompt,
-    input: question,
+    input: buildQuestionWithContext(question, sessionContext),
   };
 
   if (mode.reasoning) {
@@ -27,10 +28,10 @@ function buildRequest({ question, mode }) {
   return request;
 }
 
-export async function askOpenAI({ question, modeName }) {
+export async function askOpenAI({ question, modeName, sessionContext = [] }) {
   const mode = modes[modeName] || modes.normal;
   const client = createClient();
-  const response = await client.responses.create(buildRequest({ question, mode }));
+  const response = await client.responses.create(buildRequest({ question, mode, sessionContext }));
 
   return {
     answer: response.output_text || "",

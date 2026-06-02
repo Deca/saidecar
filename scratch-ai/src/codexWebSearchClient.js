@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { config } from "./config.js";
 import { modes } from "./modes.js";
+import { buildQuestionWithContext } from "./sessionContext.js";
 
 class CodexSearchError extends Error {
   constructor(message, status) {
@@ -115,7 +116,7 @@ async function resolveSearchModel(auth, signal) {
   }
 }
 
-function requestBody({ question, model, modeName }) {
+function requestBody({ question, model, modeName, sessionContext = [] }) {
   const deeper = modeName === "deepweb";
 
   return {
@@ -127,7 +128,7 @@ function requestBody({ question, model, modeName }) {
       {
         type: "message",
         role: "user",
-        content: [{ type: "input_text", text: question }],
+        content: [{ type: "input_text", text: buildQuestionWithContext(question, sessionContext) }],
       },
     ],
     tools: [
@@ -260,7 +261,7 @@ function formatAnswer(text, citations) {
   return `${text}\n\nSources:\n${sources.join("\n")}`;
 }
 
-export async function askCodexWebSearch({ question, modeName }) {
+export async function askCodexWebSearch({ question, modeName, sessionContext = [] }) {
   const auth = readCodexAuth();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.codexTimeoutMs);
@@ -270,7 +271,7 @@ export async function askCodexWebSearch({ question, modeName }) {
     const response = await fetch(endpoint("responses"), {
       method: "POST",
       headers: headers(auth.token, auth.accountId, "text/event-stream"),
-      body: JSON.stringify(requestBody({ question, model, modeName })),
+      body: JSON.stringify(requestBody({ question, model, modeName, sessionContext })),
       signal: controller.signal,
     });
 

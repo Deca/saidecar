@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { appendAnnotation } from "../src/annotations.js";
 import { refreshIndex, searchEntries } from "../src/logIndex.js";
 
 function makeTempPaths() {
@@ -47,6 +48,51 @@ test("refreshIndex indexes valid entries and skips unchanged files", () => {
   const results = searchEntries({ query: "SQLite", indexPath });
   assert.equal(results.length, 1);
   assert.equal(results[0].question, "How do I search logs?");
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("searchEntries overlays annotation favorite and tag filters", () => {
+  const { root, logDir, indexPath } = makeTempPaths();
+  const annotationDir = path.join(root, "annotations");
+  fs.mkdirSync(logDir, { recursive: true });
+  const logFile = path.join(logDir, "2026-06-01.jsonl");
+
+  writeJsonl(logFile, [
+    {
+      timestamp: "2026-06-01T10:00:00.000Z",
+      project: "demo",
+      backend: "codex",
+      mode: "normal",
+      question: "How do I restart queues?",
+      answer: "Use queue:restart.",
+    },
+    {
+      timestamp: "2026-06-01T10:10:00.000Z",
+      project: "demo",
+      backend: "codex",
+      mode: "normal",
+      question: "Random thought",
+      answer: "Disposable.",
+    },
+  ]);
+
+  refreshIndex({ logDir, indexPath });
+  appendAnnotation({
+    annotationDir,
+    entryRef: { logFile, lineNumber: 1 },
+    favorite: true,
+    tags: ["laravel"],
+  });
+
+  const saved = searchEntries({ saved: true, indexPath, annotationDir });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].favorite, true);
+  assert.deepEqual(saved[0].tags, ["laravel"]);
+
+  const tagged = searchEntries({ tag: "laravel", indexPath, annotationDir });
+  assert.equal(tagged.length, 1);
+  assert.equal(tagged[0].question, "How do I restart queues?");
 
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -24,6 +24,10 @@ function defaultIndexPath(logDir) {
   return path.join(path.dirname(logDir), "scratch-ai.sqlite");
 }
 
+function defaultBrainPath(logDir, childDir) {
+  return path.join(path.dirname(logDir), childDir);
+}
+
 export const config = {
   apiKey: process.env.OPENAI_API_KEY,
   backend: (process.env.SCRATCH_AI_BACKEND || "openai").toLowerCase(),
@@ -47,6 +51,14 @@ export const config = {
   indexPath: expandHome(
     process.env.SCRATCH_AI_INDEX_PATH ||
       defaultIndexPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"))
+  ),
+  annotationDir: expandHome(
+    process.env.SCRATCH_AI_ANNOTATION_DIR ||
+      defaultBrainPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"), "annotations")
+  ),
+  sessionDir: expandHome(
+    process.env.SCRATCH_AI_SESSION_DIR ||
+      defaultBrainPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"), "sessions")
   ),
   project: process.env.SCRATCH_AI_PROJECT || "general",
   timezone: process.env.SCRATCH_AI_TIMEZONE || "Europe/Rome",

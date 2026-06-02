@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { config } from "./config.js";
 import { modes } from "./modes.js";
 import { systemPrompt } from "./prompt.js";
+import { formatSessionContext } from "./sessionContext.js";
 
 function codexInvocation(args) {
   if (process.platform !== "win32" || config.codexCommand !== "codex") {
@@ -51,11 +52,13 @@ function reasoningEffort(modeName) {
   return "none";
 }
 
-function buildPrompt({ question, modeName }) {
+function buildPrompt({ question, modeName, sessionContext = [] }) {
   const webNote =
     modeName === "web" || modeName === "deepweb"
       ? "The wrapper requested web mode, but this Codex exec backend does not expose native web search. Do not claim to have browsed. If current information is required, say that this backend cannot browse."
       : "Do not use web search.";
+
+  const context = formatSessionContext(sessionContext);
 
   return `${systemPrompt}
 
@@ -68,6 +71,12 @@ Codex backend constraints:
 - ${webNote}
 
 Mode: ${modeName}
+${context ? `
+Recent Scratch AI session context:
+${context}
+
+Use this recent context only when it helps answer the current question. If the current question is unrelated, ignore it.
+` : ""}
 
 Question:
 ${question}`;
@@ -135,7 +144,7 @@ async function ensureCodexLoggedIn() {
   });
 }
 
-export async function askCodex({ question, modeName }) {
+export async function askCodex({ question, modeName, sessionContext = [] }) {
   await ensureCodexLoggedIn();
 
   const mode = modes[modeName] || modes.normal;
@@ -164,7 +173,7 @@ export async function askCodex({ question, modeName }) {
 
   args.push("-");
 
-  const prompt = buildPrompt({ question, modeName });
+  const prompt = buildPrompt({ question, modeName, sessionContext });
 
   return new Promise((resolve, reject) => {
     let stdout = "";

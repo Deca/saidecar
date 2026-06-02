@@ -4,6 +4,8 @@
   "scripts": {
     "start": "npm --prefix scratch-ai start",
     "logs": "npm --prefix scratch-ai run logs",
+    "digest": "npm --prefix scratch-ai run digest",
+    "doctor": "npm --prefix scratch-ai run doctor",
     "check": "npm --prefix scratch-ai run check",
     "test": "npm --prefix scratch-ai test",
     "zellij:pane": "npm --prefix scratch-ai run zellij:pane",

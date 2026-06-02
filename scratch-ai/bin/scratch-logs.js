@@ -5,16 +5,23 @@ import { render } from "ink";
 import { LogExplorerApp } from "../src/logExplorerApp.js";
 import { refreshIndex, searchEntries } from "../src/logIndex.js";
 import { config } from "../src/config.js";
+import { formatEntriesMarkdown, formatEntriesText } from "../src/logExport.js";
 
 function printHelp() {
   console.log(`Usage:
   scratch-logs
   scratch-logs --query <text>
+  scratch-logs --query <text> --format markdown
+  scratch-logs --date today|7d|30d|all --format markdown
   scratch-logs --help
 
 Options:
   --query <text>   Run a non-interactive search and print matching entries.
   --limit <n>      Limit non-interactive results. Default: 20.
+  --date <range>   Filter results by today, 7d, 30d, or all.
+  --saved          Show only saved/favorited entries.
+  --tag <tag>      Show only entries with a tag.
+  --format <name>  text or markdown. Default: text.
   --reindex        Refresh the index before returning.
 
 Environment:
@@ -34,17 +41,15 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 
 const stats = refreshIndex();
 const query = argValue("--query");
+const format = argValue("--format") || "text";
+const date = argValue("--date") || "all";
+const saved = process.argv.includes("--saved");
+const tag = argValue("--tag") || "all";
 
-if (query !== undefined) {
+if (query !== undefined || process.argv.includes("--date") || saved || tag !== "all") {
   const limit = Number.parseInt(argValue("--limit") || "20", 10);
-  const entries = searchEntries({ query, limit });
-  console.log(`${entries.length} result${entries.length === 1 ? "" : "s"}`);
-
-  for (const entry of entries) {
-    console.log(
-      `${entry.timestamp || "-"} [${entry.mode || "-"}] ${entry.question || "(no question)"}`
-    );
-  }
+  const entries = searchEntries({ query: query || "", date, saved, tag, limit });
+  process.stdout.write(format === "markdown" ? formatEntriesMarkdown(entries) : formatEntriesText(entries));
 
   if (stats.malformedLines > 0) {
     console.error(`Warnings: ${stats.malformedLines} malformed JSONL line(s).`);

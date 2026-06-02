@@ -3,6 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.js";
 import { parseJsonlLine } from "./logParser.js";
+import { annotationState, entryKey } from "./annotations.js";
 
 export function openLogIndex(indexPath = config.indexPath) {
   fs.mkdirSync(path.dirname(indexPath), { recursive: true });
@@ -187,12 +188,16 @@ export function searchEntries({
   backend = "all",
   project = "all",
   date = "all",
+  saved = false,
+  tag = "all",
   limit = 100,
   indexPath = config.indexPath,
+  annotationDir = config.annotationDir,
 } = {}) {
   const db = openLogIndex(indexPath);
 
   try {
+    const annotations = annotationState({ annotationDir });
     const where = [];
     const params = {};
     let join = "";
@@ -224,7 +229,8 @@ export function searchEntries({
       params.$dateCutoff = dateCutoff;
     }
 
-    params.$limit = limit;
+    const needsAnnotationFilter = saved || tag !== "all";
+    params.$limit = needsAnnotationFilter ? Math.max(limit * 10, 1000) : limit;
     const sql = `
       SELECT entries.*
       FROM entries
@@ -234,20 +240,33 @@ export function searchEntries({
       LIMIT $limit
     `;
 
-    return db.prepare(sql).all(params).map(rowToEntry);
+    const entries = db
+      .prepare(sql)
+      .all(params)
+      .map((row) => rowToEntry(row, annotations.byEntry));
+
+    return entries
+      .filter((entry) => !saved || entry.favorite)
+      .filter((entry) => tag === "all" || entry.tags.includes(tag))
+      .slice(0, limit);
   } finally {
     db.close();
   }
 }
 
-export function getFilterOptions({ indexPath = config.indexPath } = {}) {
+export function getFilterOptions({
+  indexPath = config.indexPath,
+  annotationDir = config.annotationDir,
+} = {}) {
   const db = openLogIndex(indexPath);
 
   try {
+    const annotations = annotationState({ annotationDir });
     return {
       modes: distinctValues(db, "mode"),
       backends: distinctValues(db, "backend"),
       projects: distinctValues(db, "project"),
+      tags: [...new Set([...annotations.byEntry.values()].flatMap((item) => item.tags))].sort(),
     };
   } finally {
     db.close();
@@ -261,11 +280,23 @@ function distinctValues(db, column) {
     .map((row) => row.value);
 }
 
-function rowToEntry(row) {
+function rowToEntry(row, annotations = new Map()) {
+  const ref = {
+    logFile: row.log_file,
+    lineNumber: row.line_number,
+  };
+  const annotation = annotations.get(entryKey(ref)) || {
+    favorite: false,
+    tags: [],
+    notes: [],
+    annotations: [],
+  };
+
   return {
     id: row.id,
     logFile: row.log_file,
     lineNumber: row.line_number,
+    ref: `${path.basename(row.log_file)}:${row.line_number}`,
     timestamp: row.timestamp,
     project: row.project,
     backend: row.backend,
@@ -277,6 +308,10 @@ function rowToEntry(row) {
     usage: parseJson(row.usage_json),
     sources: parseJson(row.sources_json) || [],
     raw: parseJson(row.raw_json),
+    favorite: annotation.favorite,
+    tags: annotation.tags,
+    notes: annotation.notes,
+    annotations: annotation.annotations,
   };
 }
 

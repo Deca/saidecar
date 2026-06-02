@@ -62,6 +62,39 @@ export function parseInput(rawInput) {
     return { type: "command", command: simpleCommands[input] };
   }
 
+  if (input === "/context") {
+    return { type: "command", command: "context", action: "status" };
+  }
+
+  if (input.startsWith("/context ")) {
+    const action = input.slice("/context ".length).trim().toLowerCase();
+    if (["on", "off", "status"].includes(action)) {
+      return { type: "command", command: "context", action };
+    }
+
+    return { type: "command", command: "unknown", input };
+  }
+
+  if (input.startsWith("/save ")) {
+    const parts = input.slice("/save ".length).trim().split(/\s+/).filter(Boolean);
+    return {
+      type: "command",
+      command: "save",
+      index: Number.parseInt(parts[0], 10),
+      tags: parts.slice(1),
+    };
+  }
+
+  if (input.startsWith("/tag ")) {
+    const parts = input.slice("/tag ".length).trim().split(/\s+/).filter(Boolean);
+    return {
+      type: "command",
+      command: "tag",
+      index: Number.parseInt(parts[0], 10),
+      tags: parts.slice(1),
+    };
+  }
+
   for (const item of commandMap) {
     if (input.startsWith(item.prefix)) {
       return {

@@ -6,6 +6,13 @@ import { config, validateConfig } from "./config.js";
 import { appendLog, getLogFilePath } from "./logger.js";
 import { modes, parseInput } from "./modes.js";
 import { renderMarkdownForTerminal } from "./terminalMarkdown.js";
+import { annotateEntry } from "./annotations.js";
+import { formatDoctorChecks, runDoctorChecks } from "./doctor.js";
+import {
+  DEFAULT_CONTEXT_CHARS,
+  DEFAULT_CONTEXT_EXCHANGES,
+  selectSessionContext,
+} from "./sessionContext.js";
 
 const ui = {
   accent: chalk.hex("#C084FC"),
@@ -38,6 +45,7 @@ const session = {
     outputTokens: 0,
     totalTokens: 0,
   },
+  contextEnabled: true,
   history: [],
 };
 
@@ -221,6 +229,9 @@ ${chalk.bold("Session commands")}
   /config
   /modes
   /history
+  /context [on|off|status]
+  /save <history-index> [tag...]
+  /tag <history-index> <tag...>
   /log
   /clear
   /reset
@@ -289,7 +300,7 @@ function printIntro() {
   keyValue("backend", config.backend, chalk.yellow);
   keyValue("model", config.defaultModel, chalk.yellow);
   keyValue("think model", config.thinkModel, chalk.yellow);
-  keyValue("context", "stateless per request", chalk.yellow);
+  keyValue("context", session.contextEnabled ? "session follow-ups on" : "stateless per request", chalk.yellow);
   keyValue("project", config.project, chalk.yellow);
   keyValue("logs", getLogFilePath(), ui.dim);
   console.log(`Type ${chalk.bold("/help")} for commands. Type ${chalk.bold("/exit")} to quit.\n`);
@@ -297,8 +308,9 @@ function printIntro() {
 
 function printStatus() {
   const uptimeMs = Date.now() - session.startedAt.getTime();
-  const estimatedTranscriptTokens = estimateTokens(
-    session.history.map((item) => `${item.question}\n${item.answer}`).join("\n")
+  const contextEntries = currentSessionContext();
+  const estimatedContextTokens = estimateTokens(
+    contextEntries.map((item) => `${item.question}\n${item.answer}`).join("\n")
   );
 
   console.log("");
@@ -308,8 +320,14 @@ function printStatus() {
   keyValue("backend", config.backend, chalk.yellow);
   keyValue("model", config.defaultModel, chalk.yellow);
   keyValue("think model", config.thinkModel, chalk.yellow);
-  keyValue("context", "stateless per request", chalk.yellow);
-  keyValue("transcript", `~${estimatedTranscriptTokens} tokens; not resent automatically`, chalk.white);
+  keyValue("context", session.contextEnabled ? "on" : "off", chalk.yellow);
+  keyValue(
+    "follow-up",
+    session.contextEnabled
+      ? `${contextEntries.length} recent exchange(s), ~${estimatedContextTokens} tokens`
+      : "disabled; questions are stateless",
+    chalk.white
+  );
   keyValue("exchanges", String(session.exchanges), chalk.white);
   keyValue("errors", String(session.errors), session.errors ? chalk.red : chalk.white);
   keyValue("web calls", String(session.webCalls), chalk.white);
@@ -337,8 +355,55 @@ function printConfig() {
   keyValue("codex timeout", `${config.codexTimeoutMs}ms`, chalk.white);
   keyValue("project", config.project, chalk.white);
   keyValue("timezone", config.timezone, chalk.white);
+  keyValue("context", `${DEFAULT_CONTEXT_EXCHANGES} exchanges, ~${estimateTokens("x".repeat(DEFAULT_CONTEXT_CHARS))} token budget`, chalk.white);
   keyValue("log file", getLogFilePath(), ui.dim);
   console.log("");
+}
+
+function currentSessionContext() {
+  if (!session.contextEnabled) {
+    return [];
+  }
+
+  return selectSessionContext(session.history, {
+    maxExchanges: DEFAULT_CONTEXT_EXCHANGES,
+    maxChars: DEFAULT_CONTEXT_CHARS,
+  });
+}
+
+function printContextStatus() {
+  const entries = currentSessionContext();
+  const estimatedTokens = estimateTokens(
+    entries.map((item) => `${item.question}\n${item.answer}`).join("\n")
+  );
+
+  console.log("");
+  console.log(sectionTitle("Scratch AI context"));
+  keyValue("status", session.contextEnabled ? "on" : "off", session.contextEnabled ? chalk.yellow : chalk.white);
+  keyValue(
+    "policy",
+    `current terminal session only; max ${DEFAULT_CONTEXT_EXCHANGES} exchanges`,
+    chalk.white
+  );
+  keyValue("queued", `${entries.length} exchange(s), ~${estimatedTokens} tokens`, chalk.white);
+  keyValue("clear", "/clear keeps context; /reset clears it", ui.dim);
+  console.log("");
+}
+
+function setContext(action) {
+  if (action === "on") {
+    session.contextEnabled = true;
+    console.log(ui.dim("Session context enabled. Recent exchanges will be sent with new questions."));
+    return;
+  }
+
+  if (action === "off") {
+    session.contextEnabled = false;
+    console.log(ui.dim("Session context disabled. New questions are stateless."));
+    return;
+  }
+
+  printContextStatus();
 }
 
 function printModes() {
@@ -368,8 +433,56 @@ function printHistory() {
 
   console.log(sectionTitle("Recent questions"));
   for (const item of session.history.slice(-10)) {
-    console.log(`${ui.dim(String(item.index).padStart(2))}. ${modeColor(item.mode)(`[${item.mode}]`)} ${item.question}`);
+    const ref = item.logRef ? ui.dim(` line=${item.logRef.lineNumber}`) : "";
+    console.log(`${ui.dim(String(item.index).padStart(2))}. ${modeColor(item.mode)(`[${item.mode}]`)}${ref} ${item.question}`);
   }
+}
+
+function findHistoryEntry(index) {
+  if (!Number.isFinite(index)) {
+    throw new Error("Use a numeric history index, for example `/save 3 laravel`.");
+  }
+
+  const entry = session.history.find((item) => item.index === index);
+  if (!entry) {
+    throw new Error(`No history entry ${index}. Use /history to see recent entries.`);
+  }
+
+  if (!entry.logRef) {
+    throw new Error(`History entry ${index} has not been logged yet.`);
+  }
+
+  return entry;
+}
+
+function saveHistoryEntry(index, tags = []) {
+  const entry = findHistoryEntry(index);
+  annotateEntry(
+    {
+      logFile: entry.logRef.logFile,
+      lineNumber: entry.logRef.lineNumber,
+      project: config.project,
+    },
+    { favorite: true, tags }
+  );
+  console.log(ui.dim(`Saved #${entry.index}${tags.length ? ` with tags: ${tags.join(", ")}` : ""}.`));
+}
+
+function tagHistoryEntry(index, tags = []) {
+  if (!tags.length) {
+    throw new Error("Add at least one tag, for example `/tag 3 laravel queue`.");
+  }
+
+  const entry = findHistoryEntry(index);
+  annotateEntry(
+    {
+      logFile: entry.logRef.logFile,
+      lineNumber: entry.logRef.lineNumber,
+      project: config.project,
+    },
+    { tags }
+  );
+  console.log(ui.dim(`Tagged #${entry.index}: ${tags.join(", ")}.`));
 }
 
 function resetSessionStats() {
@@ -385,7 +498,7 @@ function resetSessionStats() {
   session.totalUsage.outputTokens = 0;
   session.totalUsage.totalTokens = 0;
   session.history = [];
-  console.log(ui.dim("Session counters reset. Logs were not changed."));
+  console.log(ui.dim("Session counters and live context reset. Logs were not changed."));
 }
 
 async function handleQuestion(parsed) {
@@ -395,6 +508,7 @@ async function handleQuestion(parsed) {
   }
 
   const startedAt = Date.now();
+  const sessionContext = currentSessionContext();
   printRequestHeader(parsed);
 
   const stopThinking = startThinkingAnimation(parsed.mode);
@@ -404,6 +518,7 @@ async function handleQuestion(parsed) {
     result = await askModel({
       question: parsed.question,
       modeName: parsed.mode,
+      sessionContext,
     });
   } finally {
     stopThinking();
@@ -446,7 +561,7 @@ async function handleQuestion(parsed) {
   });
 
   try {
-    appendLog({
+    const logRef = appendLog({
       backend: result.backend || config.backend,
       mode: parsed.mode,
       model: result.mode.model,
@@ -454,13 +569,24 @@ async function handleQuestion(parsed) {
       answer,
       durationMs,
       usage,
+      context: {
+        enabled: session.contextEnabled,
+        exchanges: sessionContext.length,
+      },
     });
+    session.history[session.history.length - 1].logRef = logRef;
   } catch (error) {
     console.error(chalk.yellow(`Log warning: ${error.message}`));
   }
 }
 
 export async function runCli() {
+  if (process.argv.includes("doctor") || process.argv.includes("--doctor")) {
+    const checks = await runDoctorChecks();
+    console.log(formatDoctorChecks(checks));
+    process.exit(checks.some((item) => !item.ok) ? 1 : 0);
+  }
+
   validateConfig();
 
   const rl = readline.createInterface({ input, output });
@@ -508,6 +634,21 @@ export async function runCli() {
 
         if (parsed.command === "history") {
           printHistory();
+          continue;
+        }
+
+        if (parsed.command === "context") {
+          setContext(parsed.action);
+          continue;
+        }
+
+        if (parsed.command === "save") {
+          saveHistoryEntry(parsed.index, parsed.tags);
+          continue;
+        }
+
+        if (parsed.command === "tag") {
+          tagHistoryEntry(parsed.index, parsed.tags);
           continue;
         }
 

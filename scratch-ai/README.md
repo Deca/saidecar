@@ -14,6 +14,8 @@ It is intentionally not a coding agent. In direct OpenAI mode it does not scan r
 - `/deepweb` reasoning + web-search mode
 - Local JSONL logging
 - Read-only log explorer with SQLite FTS search
+- Saved/favorited/tagged log annotations
+- On-demand Markdown review/digest generation
 - Designed for narrow Zellij side panes
 - No repo mutation
 - No shell execution
@@ -40,6 +42,20 @@ Open the log explorer directly:
 scratch-logs
 ```
 
+Run environment checks:
+
+```bash
+scratch-doctor
+scratch-ai doctor
+```
+
+Generate a local Markdown review:
+
+```bash
+scratch-digest
+scratch-digest --saved-only --write
+```
+
 For local development:
 
 ```bash
@@ -62,6 +78,9 @@ npm start
 /config
 /modes
 /history
+/context [on|off|status]
+/save <history-index> [tag...]
+/tag <history-index> <tag...>
 /log
 /clear
 /reset
@@ -79,18 +98,36 @@ extra thinking room without taking the handlebars
 
 Agent answers are rendered with terminal-friendly markdown styling. Headings, lists, task items, blockquotes, links, inline code, emphasis, and fenced code blocks are styled for readability in the pane. This only affects terminal display; the JSONL log keeps the raw markdown answer so citations, search, and later processing still have the original text.
 
+## Session Context
+
+Scratch AI includes recent turns from the current terminal session by default so short follow-up questions work naturally.
+
+```text
+/context
+/context on
+/context off
+```
+
+Context is intentionally local and temporary:
+
+- only the current terminal session is used
+- only the last few exchanges are sent
+- old logs, saved entries, digests, files, and search results are not added automatically
+- `/clear` only clears the terminal display
+- `/reset` clears live history, counters, and follow-up context, but does not delete logs
+
 ## Session Info
 
 Use `/status` to see the current terminal session:
 
 - backend and active models
-- stateless request context
+- current session context status
 - estimated transcript size for the current terminal session
 - exchange count, errors, web calls, and last latency
 - API token usage when the direct OpenAI backend reports it
 - current JSONL log file
 
-The MVP does not automatically resend prior answers as context. The transcript estimate is for your visibility only.
+Logs remain append-only. Resetting a session does not remove JSONL entries, SQLite index data, or saved/favorited/tagged annotations.
 
 ## Modes
 
@@ -276,6 +313,9 @@ Errors are also logged when possible so the CLI can keep running.
 ```bash
 scratch-logs
 scratch-logs --query "sqlite fts" --limit 5
+scratch-logs --query "sqlite fts" --format markdown
+scratch-logs --date today --format markdown
+scratch-logs --saved --tag laravel --format markdown
 ```
 
 Environment:
@@ -283,6 +323,8 @@ Environment:
 ```env
 SCRATCH_AI_LOG_DIR=~/dev-brain/inbox
 SCRATCH_AI_INDEX_PATH=~/dev-brain/scratch-ai.sqlite
+SCRATCH_AI_ANNOTATION_DIR=~/dev-brain/annotations
+SCRATCH_AI_SESSION_DIR=~/dev-brain/sessions
 ```
 
 If `SCRATCH_AI_INDEX_PATH` is unset, it defaults to `scratch-ai.sqlite` next to the log directory parent. For the default log directory, that is `~/dev-brain/scratch-ai.sqlite`.
@@ -298,9 +340,56 @@ m cycle mode
 b cycle backend
 p cycle project
 d cycle date
+g cycle tag
+s toggle saved-only
+f favorite/save selected entry
 r reindex
 q quit from list/detail
 ctrl+c quit anywhere
+```
+
+## Saved Entries And Tags
+
+Raw Q&A logs stay append-only under `SCRATCH_AI_LOG_DIR`. Favorites, tags, and notes are stored separately as append-only JSONL under:
+
+```text
+~/dev-brain/annotations/YYYY-MM-DD.jsonl
+```
+
+From the active CLI session, use `/history` to find a recent question index, then:
+
+```text
+/save 3 laravel queues
+/tag 3 ops
+```
+
+In `scratch-logs`, press `f` to favorite the selected entry.
+
+## Digest
+
+`scratch-digest` creates an explicit local review of a day of Scratch AI logs. It is deterministic and local-first; it does not call a model.
+
+```bash
+scratch-digest
+scratch-digest --date 2026-06-01
+scratch-digest --saved-only
+scratch-digest --write
+scratch-digest --dry-run
+```
+
+With `--write`, Markdown is saved under:
+
+```text
+~/dev-brain/sessions/YYYY-MM-DD.md
+```
+
+## Doctor
+
+`scratch-doctor` checks Node.js, `node:sqlite`, backend configuration, Codex auth file presence when `SCRATCH_AI_BACKEND=codex`, and writable log/index/annotation directories.
+
+```bash
+scratch-doctor
+scratch-ai doctor
 ```
 
 ## Validation
