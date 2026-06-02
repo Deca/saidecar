@@ -5,6 +5,7 @@ import { askModel } from "./modelClient.js";
 import { config, validateConfig } from "./config.js";
 import { appendLog, getLogFilePath } from "./logger.js";
 import { modes, parseInput } from "./modes.js";
+import { renderMarkdownForTerminal } from "./terminalMarkdown.js";
 
 const ui = {
   accent: chalk.hex("#C084FC"),
@@ -15,6 +16,10 @@ const ui = {
   dim: chalk.hex("#626872"),
   text: chalk.hex("#E5E7EB"),
   userBlock: chalk.bgHex("#12352D").hex("#D9FBE8"),
+  retroRed: chalk.hex("#B65A36"),
+  retroGold: chalk.hex("#C8793B"),
+  retroGreen: chalk.hex("#D39A45"),
+  retroBlue: chalk.hex("#D8B15A"),
 };
 
 const session = {
@@ -226,8 +231,60 @@ ${chalk.bold("Logs")}
 `);
 }
 
+function printSplash() {
+  const logo = [
+    [
+      "███████╗",
+      " █████╗ ██╗",
+      "██████╗ ███████╗ ██████╗ █████╗ ██████╗",
+    ],
+    [
+      "██╔════╝",
+      "██╔══██╗██║",
+      "██╔══██╗██╔════╝██╔════╝██╔══██╗██╔══██╗",
+    ],
+    [
+      "███████╗",
+      "███████║██║",
+      "██║  ██║█████╗  ██║     ███████║██████╔╝",
+    ],
+    [
+      "╚════██║",
+      "██╔══██║██║",
+      "██║  ██║██╔══╝  ██║     ██╔══██║██╔══██╗",
+    ],
+    [
+      "███████║",
+      "██║  ██║██║",
+      "██████╔╝███████╗╚██████╗██║  ██║██║  ██║",
+    ],
+    [
+      "╚══════╝",
+      "╚═╝  ╚═╝╚═╝",
+      "╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝",
+    ],
+  ];
+  const splashColors = [ui.retroRed, ui.retroGold, ui.retroGreen, ui.retroBlue];
+  const aiColors = [
+    chalk.hex("#F3F4F6"),
+    chalk.hex("#D1D5DB"),
+    chalk.hex("#9CA3AF"),
+    chalk.hex("#6B7280"),
+  ];
+
+  console.log("");
+  for (const [index, [s, ai, decar]] of logo.entries()) {
+    const color = splashColors[index % splashColors.length];
+    const aiColor = aiColors[index % aiColors.length];
+    console.log(`${color.bold(s)}${aiColor.bold(ai)}${color.bold(decar)}`);
+  }
+
+  console.log(ui.dim("extra thinking room without taking the handlebars"));
+  console.log("");
+}
+
 function printIntro() {
-  console.log(ui.accent.bold("scratch-ai"));
+  printSplash();
   keyValue("session", session.id, chalk.yellow);
   keyValue("backend", config.backend, chalk.yellow);
   keyValue("model", config.defaultModel, chalk.yellow);
@@ -358,7 +415,7 @@ async function handleQuestion(parsed) {
 
   printAnswerHeader(result);
   console.log("");
-  console.log(answer || chalk.yellow("(empty answer)"));
+  console.log(answer ? renderMarkdownForTerminal(answer) : chalk.yellow("(empty answer)"));
   printFooter(durationMs, usage);
 
   session.exchanges += 1;

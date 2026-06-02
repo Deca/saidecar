@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node ./bin/scratch-ai.js",
     "logs": "node ./bin/scratch-logs.js",
-    "check": "node --check ./bin/scratch-ai.js && node --check ./bin/scratch-logs.js && node --check ./src/config.js && node --check ./src/modes.js && node --check ./src/prompt.js && node --check ./src/logger.js && node --check ./src/openaiClient.js && node --check ./src/codexClient.js && node --check ./src/codexWebSearchClient.js && node --check ./src/modelClient.js && node --check ./src/logParser.js && node --check ./src/logIndex.js && node --check ./src/logExplorerApp.js && node --check ./src/cli.js && node --check ./scripts/zellij-session.js && node --check ./scripts/zellij-pane.js",
+    "check": "node --check ./bin/scratch-ai.js && node --check ./bin/scratch-logs.js && node --check ./src/config.js && node --check ./src/modes.js && node --check ./src/prompt.js && node --check ./src/logger.js && node --check ./src/openaiClient.js && node --check ./src/codexClient.js && node --check ./src/codexWebSearchClient.js && node --check ./src/modelClient.js && node --check ./src/logParser.js && node --check ./src/logIndex.js && node --check ./src/logExplorerApp.js && node --check ./src/terminalMarkdown.js && node --check ./src/cli.js && node --check ./scripts/zellij-session.js && node --check ./scripts/zellij-pane.js",
     "test": "node --test",
     "zellij:pane": "node ./scripts/zellij-pane.js",
     "zellij:session": "node ./scripts/zellij-session.js",

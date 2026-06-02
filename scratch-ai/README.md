@@ -7,6 +7,7 @@ It is intentionally not a coding agent. In direct OpenAI mode it does not scan r
 ## Features
 
 - Interactive terminal prompt
+- Markdown-styled answer rendering in the terminal
 - Normal fast Q&A
 - `/think` reasoning mode
 - `/web` web-search mode
@@ -67,6 +68,16 @@ npm start
 ```
 
 Normal input without a slash is treated as a fast question.
+
+## Terminal Presentation
+
+On startup, `scratch-ai` prints a Sidecar AI splash before the session metadata. The splash uses a block-letter logo with warm vintage color bands on `S` and `DECAR`, a grey gradient on `AI`, and the tagline:
+
+```text
+extra thinking room without taking the handlebars
+```
+
+Agent answers are rendered with terminal-friendly markdown styling. Headings, lists, task items, blockquotes, links, inline code, emphasis, and fenced code blocks are styled for readability in the pane. This only affects terminal display; the JSONL log keeps the raw markdown answer so citations, search, and later processing still have the original text.
 
 ## Session Info
 
