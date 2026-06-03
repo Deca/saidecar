@@ -43,6 +43,7 @@ const session = {
   lastDurationMs: null,
   lastModel: null,
   lastUsage: null,
+  lastTiming: null,
   totalUsage: {
     inputTokens: 0,
     outputTokens: 0,
@@ -168,7 +169,36 @@ function printAnswerHeader(result) {
   console.log(ui.dim(`backend=${result.backend || config.backend}`));
 }
 
-function printFooter(durationMs, usage, filterDecision) {
+function formatStageMs(ms) {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "0ms";
+  }
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function formatTimingBreakdown(timing) {
+  if (!timing) {
+    return "";
+  }
+
+  const parts = [];
+  if (timing.loginMs > 0) {
+    parts.push(`login=${formatStageMs(timing.loginMs)}`);
+  }
+  if (timing.cliStartupMs > 0) {
+    parts.push(`cli=${formatStageMs(timing.cliStartupMs)}`);
+  }
+  if (timing.modelMs > 0) {
+    parts.push(`model=${formatStageMs(timing.modelMs)}`);
+  }
+
+  return parts.length > 0 ? ` | ${parts.join(" ")}` : "";
+}
+
+function printFooter(durationMs, usage, filterDecision, timing) {
   const usageText = usage
     ? ` | tokens=${usageValue(usage, "totalTokens") || "?"}`
     : "";
@@ -177,8 +207,10 @@ function printFooter(durationMs, usage, filterDecision) {
     ? ` | ${filterDecision === "keep" ? chalk.green("●") : filterDecision === "condense" ? chalk.yellow("◐") : chalk.gray("○")}`
     : "";
 
+  const timingText = formatTimingBreakdown(timing);
+
   printSoftDivider();
-  console.log(ui.dim(`[done ${formatDuration(durationMs)}${usageText}${filterIndicator}]\n`));
+  console.log(ui.dim(`[done ${formatDuration(durationMs)}${usageText}${timingText}${filterIndicator}]\n`));
 }
 
 function printHelp() {
@@ -316,6 +348,13 @@ function printStatus() {
   keyValue("last mode", session.lastMode || "-", session.lastMode ? modeColor(session.lastMode) : chalk.white);
   keyValue("last model", session.lastModel || "-", chalk.white);
   keyValue("last latency", session.lastDurationMs ? formatDuration(session.lastDurationMs) : "-", chalk.white);
+  if (session.lastTiming) {
+    keyValue(
+      "last breakdown",
+      formatTimingBreakdown(session.lastTiming).replace(/^\s\|\s/, ""),
+      ui.dim
+    );
+  }
   keyValue(
     "api usage",
     session.totalUsage.totalTokens
@@ -487,6 +526,7 @@ function resetSessionStats() {
   session.lastDurationMs = null;
   session.lastModel = null;
   session.lastUsage = null;
+  session.lastTiming = null;
   session.totalUsage.inputTokens = 0;
   session.totalUsage.outputTokens = 0;
   session.totalUsage.totalTokens = 0;
@@ -540,6 +580,7 @@ async function handleQuestion(parsed) {
   session.lastDurationMs = durationMs;
   session.lastModel = result.mode.model;
   session.lastUsage = usage;
+  session.lastTiming = result.timing || null;
 
   if (usage) {
     const inputTokens = usageValue(usage, "inputTokens");
@@ -586,7 +627,7 @@ async function handleQuestion(parsed) {
     console.error(chalk.yellow(`Log warning: ${error.message}`));
   }
 
-  printFooter(durationMs, usage, filterDecision);
+  printFooter(durationMs, usage, filterDecision, result.timing);
 }
 
 export async function runCli() {

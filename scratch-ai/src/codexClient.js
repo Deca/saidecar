@@ -8,6 +8,21 @@ import { modes } from "./modes.js";
 import { systemPrompt } from "./prompt.js";
 import { formatSessionContext } from "./sessionContext.js";
 
+// How long a successful `codex login status` check is trusted before we re-verify.
+// The login check itself costs ~1-2s per call, so re-checking on every question is wasteful.
+const LOGIN_CHECK_TTL_MS = 10 * 60 * 1000;
+const LOGIN_CHECK_TIMEOUT_MS = 10_000;
+
+let lastSuccessfulLoginCheck = 0;
+let loginCheckInflight = null;
+
+// Allow tests to inject a fake `spawn`. Default uses node:child_process.
+let spawnImpl = spawn;
+
+export function _setSpawnForTests(fn) {
+  spawnImpl = fn ?? spawn;
+}
+
 function codexInvocation(args) {
   if (process.platform !== "win32" || config.codexCommand !== "codex") {
     return {
@@ -96,13 +111,13 @@ function codexErrorMessage(stderr, stdout, exitCode) {
   }`;
 }
 
-async function ensureCodexLoggedIn() {
+function runLoginCheck() {
   const invocation = codexInvocation(["login", "status"]);
 
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
-    const child = spawn(invocation.command, invocation.args, {
+    const child = spawnImpl(invocation.command, invocation.args, {
       cwd: os.tmpdir(),
       shell: invocation.shell || false,
       windowsHide: true,
@@ -112,7 +127,7 @@ async function ensureCodexLoggedIn() {
     const timeout = setTimeout(() => {
       child.kill();
       reject(new Error("Timed out while checking Codex login status."));
-    }, 10000);
+    }, LOGIN_CHECK_TIMEOUT_MS);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -144,8 +159,44 @@ async function ensureCodexLoggedIn() {
   });
 }
 
+export function isLoginCheckFresh(now = Date.now()) {
+  return now - lastSuccessfulLoginCheck < LOGIN_CHECK_TTL_MS;
+}
+
+export function resetLoginCheckCache() {
+  lastSuccessfulLoginCheck = 0;
+  loginCheckInflight = null;
+}
+
+async function ensureCodexLoggedIn() {
+  if (isLoginCheckFresh()) {
+    return;
+  }
+
+  if (loginCheckInflight) {
+    await loginCheckInflight;
+    if (isLoginCheckFresh()) {
+      return;
+    }
+  }
+
+  const promise = runLoginCheck()
+    .then(() => {
+      lastSuccessfulLoginCheck = Date.now();
+    })
+    .finally(() => {
+      loginCheckInflight = null;
+    });
+
+  loginCheckInflight = promise;
+  await promise;
+}
+
 export async function askCodex({ question, modeName, sessionContext = [] }) {
+  const startedAt = Date.now();
+
   await ensureCodexLoggedIn();
+  const loginMs = Date.now() - startedAt;
 
   const mode = modes[modeName] || modes.normal;
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-codex-"));
@@ -179,8 +230,10 @@ export async function askCodex({ question, modeName, sessionContext = [] }) {
     let stdout = "";
     let stderr = "";
     let settled = false;
+    const spawnStartedAt = Date.now();
+    let firstByteAt = null;
     const invocation = codexInvocation(args);
-    const child = spawn(invocation.command, invocation.args, {
+    const child = spawnImpl(invocation.command, invocation.args, {
       cwd: os.tmpdir(),
       shell: invocation.shell || false,
       windowsHide: true,
@@ -200,6 +253,9 @@ export async function askCodex({ question, modeName, sessionContext = [] }) {
     }, config.codexTimeoutMs);
 
     child.stdout.on("data", (chunk) => {
+      if (firstByteAt === null) {
+        firstByteAt = Date.now();
+      }
       stdout += chunk.toString();
     });
 
@@ -237,12 +293,22 @@ export async function askCodex({ question, modeName, sessionContext = [] }) {
           ? fs.readFileSync(outputFile, "utf8")
           : stdout;
 
+        const closedAt = Date.now();
+        const cliStartupMs = firstByteAt !== null ? firstByteAt - spawnStartedAt : closedAt - spawnStartedAt;
+        const modelMs = firstByteAt !== null ? closedAt - firstByteAt : 0;
+
         resolve({
           answer: answer.trim(),
           raw: { stdout, stderr },
           usage: null,
           mode,
           backend: "codex",
+          timing: {
+            loginMs,
+            cliStartupMs,
+            modelMs,
+            totalMs: closedAt - startedAt,
+          },
         });
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
