@@ -145,19 +145,53 @@ The bridge adapts the MIT-licensed approach used by `pi-codex-search`; see `THIR
 ## Configuration
 
 ```env
+# Provider selection
+SCRATCH_AI_PROVIDER=openai      # openai, deepseek, anthropic
+PROVIDER_API_KEY=                # API key for third-party providers (deepseek, anthropic)
+PROVIDER_BASE_URL=               # Optional custom endpoint URL
+
+# Backend
+SCRATCH_AI_BACKEND=openai        # openai or codex
+
+# OpenAI (when SCRATCH_AI_PROVIDER=openai)
 OPENAI_API_KEY=
-SCRATCH_AI_BACKEND=openai
-SCRATCH_AI_MODEL=gpt-5.4-mini
-SCRATCH_AI_THINK_MODEL=gpt-5.4-mini
+
+# Models
+SCRATCH_AI_MODEL=gpt-4o-mini
+SCRATCH_AI_THINK_MODEL=gpt-4o-mini
+
+# Codex
 SCRATCH_AI_CODEX_COMMAND=codex
 SCRATCH_AI_CODEX_TIMEOUT_MS=120000
+
+# Storage
 SCRATCH_AI_LOG_DIR=~/dev-brain/inbox
 SCRATCH_AI_INDEX_PATH=~/dev-brain/scratch-ai.sqlite
 SCRATCH_AI_PROJECT=general
 SCRATCH_AI_TIMEZONE=Europe/Rome
 ```
 
-The model defaults are conservative examples. Override them if your OpenAI account uses different model names.
+### Provider Setup
+
+**OpenAI** (default):
+```env
+SCRATCH_AI_PROVIDER=openai
+OPENAI_API_KEY=your_openai_api_key
+```
+
+**DeepSeek** (affordable OpenAI-compatible):
+```env
+SCRATCH_AI_PROVIDER=deepseek
+PROVIDER_API_KEY=sk-...
+```
+
+**Anthropic Claude**:
+```env
+SCRATCH_AI_PROVIDER=anthropic
+PROVIDER_API_KEY=sk-ant-...
+```
+
+The model defaults are conservative examples. Override them if your account uses different model names.
 
 ## Codex OAuth Backend
 
