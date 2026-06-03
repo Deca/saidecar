@@ -74,7 +74,65 @@ export function appendLog(entry) {
   } catch (error) {
     throw new Error(`Failed to append log: ${error.message}`);
   }
+
+  triggerAutoFilter(entry);
+
   return { logFile, lineNumber };
+}
+
+let autoFilterRunning = false;
+let autoFilterQueue = [];
+
+async function processAutoFilterQueue() {
+  if (autoFilterRunning || autoFilterQueue.length === 0) {
+    return;
+  }
+
+  autoFilterRunning = true;
+
+  while (autoFilterQueue.length > 0) {
+    const entry = autoFilterQueue.shift();
+    try {
+      const { scoreEntry, formatAutoFilterMetadata } = await import("./autoFilter.js");
+      const result = await scoreEntry({
+        question: entry.question,
+        answer: entry.answer,
+        mode: entry.mode,
+        model: entry.model,
+      });
+
+      if (result) {
+        const metadata = formatAutoFilterMetadata(result);
+        if (metadata) {
+          const filterFile = getLogFilePath();
+          const filterLine = JSON.stringify({
+            timestamp: new Date().toISOString(),
+            type: "auto_filter",
+            ...metadata,
+          });
+          const filterEntry = { question: entry.question, answer: entry.answer };
+          console.log(`[auto-filter] ${result.decision}: ${entry.question?.slice(0, 50)}...`);
+        }
+      }
+    } catch (error) {
+      console.error("[auto-filter] Scoring failed:", error.message);
+    }
+  }
+
+  autoFilterRunning = false;
+}
+
+function triggerAutoFilter(entry) {
+  if (!config.autoFilterEnabled) {
+    return;
+  }
+
+  if (!entry.question || !entry.answer) {
+    return;
+  }
+
+  autoFilterQueue.push(entry);
+  setImmediate(processAutoFilterQueue);
 }
 
 export async function appendLogAsync(entry) {
