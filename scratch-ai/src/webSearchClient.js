@@ -14,14 +14,14 @@ class WebSearchError extends Error {
   }
 }
 
-// DuckDuckGo HTML search - reliable, no API key needed
+// DuckDuckGo Lite HTML search - reliable, less bot-protected
 async function duckduckgoSearch(query, count = 10) {
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
 
   const response = await fetch(url, {
     headers: {
       "Accept": "text/html",
-      "User-Agent": "Mozilla/5.0 (compatible; ScratchAI/1.0)",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     },
   });
 
@@ -31,45 +31,63 @@ async function duckduckgoSearch(query, count = 10) {
 
   const html = await response.text();
 
-  // Parse results from DuckDuckGo HTML
+  // Parse DuckDuckGo Lite results
+  // Format: <a class='result-link' href='//duckduckgo.com/l/?uddg=<encoded_url>&...'>TITLE</a>
+  //         <td class='result-snippet'>SNIPPET</td>
+
   const results = [];
-  const resultRegex = /<a class="result__a" href="([^"]+)"[^>]*>([^<]+)<\/a>/g;
-  const snippetRegex = /<a class="result__snippet"[^>]*>([^<]+)<\/a>/g;
 
-  // Simple HTML parsing for DuckDuckGo results
-  const lines = html.split("\n");
-  let currentUrl = "";
-  let currentTitle = "";
+  // Match all result-link elements
+  const linkRegex = /<a[^>]*class=['"]result-link['"][^>]*href=['"][^'"]*uddg=([^&'"]+)[^'"]*['"][^>]*>([\s\S]*?)<\/a>/g;
+  let match;
 
-  for (const line of lines) {
-    // Match result URLs
-    const urlMatch = line.match(/<a class="result__a" href="(https?:\/\/[^"]+)"/);
-    if (urlMatch) {
-      currentUrl = urlMatch[1];
+  while ((match = linkRegex.exec(html)) !== null) {
+    const encodedUrl = match[1];
+    const title = stripHtml(match[2]).trim();
+
+    // Find the snippet that follows this link
+    const afterLink = html.slice(match.index + match[0].length, match.index + match[0].length + 2000);
+    const snippetMatch = afterLink.match(/<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/);
+
+    let snippet = "";
+    if (snippetMatch) {
+      snippet = stripHtml(snippetMatch[1]).trim();
     }
 
-    // Match result titles (next line usually)
-    const titleMatch = line.match(/>([^<]+)<\/a>/);
-    if (titleMatch && currentUrl && !line.includes("result__a")) {
-      currentTitle = titleMatch[1].trim();
+    // Decode the URL
+    let actualUrl;
+    try {
+      actualUrl = decodeURIComponent(encodedUrl);
+    } catch {
+      actualUrl = encodedUrl;
     }
 
-    // Match snippets
-    const snippetMatch = line.match(/class="result__snippet"[^>]*>([^<]+)<\/a>/);
-    if (snippetMatch && currentUrl) {
+    if (actualUrl && title) {
       results.push({
-        title: currentTitle || "Untitled",
-        url: currentUrl,
-        snippet: snippetMatch[1].trim().replace(/<[^>]+>/g, ""),
+        title,
+        url: actualUrl,
+        snippet,
         engine: "duckduckgo",
       });
-      currentUrl = "";
-      currentTitle = "";
-      if (results.length >= count) break;
     }
+
+    if (results.length >= count) break;
   }
 
   return results;
+}
+
+function stripHtml(str) {
+  return str
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#x27;/g, "'")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ");
 }
 
 // Fallback: use a simple API approach
