@@ -5,7 +5,7 @@ import chalk from "chalk";
 import { askModel } from "./modelClient.js";
 import { config, validateConfig } from "./config.js";
 import { wrapText } from "./textUtils.js";
-import { appendLog, getLogFilePath } from "./logger.js";
+import { appendLog, getLogFilePath, triggerAutoFilterAndWait } from "./logger.js";
 import { modes, parseInput } from "./modes.js";
 import { renderMarkdownForTerminal } from "./terminalMarkdown.js";
 import { annotateEntry } from "./annotations.js";
@@ -165,13 +165,17 @@ function printAnswerHeader(result) {
   console.log(ui.dim(`backend=${result.backend || config.backend}`));
 }
 
-function printFooter(durationMs, usage) {
+function printFooter(durationMs, usage, filterDecision) {
   const usageText = usage
     ? ` | tokens=${usageValue(usage, "totalTokens") || "?"}`
     : "";
 
+  const filterIndicator = filterDecision
+    ? ` | ${filterDecision === "keep" ? chalk.green("●") : filterDecision === "condense" ? chalk.yellow("◐") : chalk.gray("○")}`
+    : "";
+
   printSoftDivider();
-  console.log(ui.dim(`[done ${formatDuration(durationMs)}${usageText}]\n`));
+  console.log(ui.dim(`[done ${formatDuration(durationMs)}${usageText}${filterIndicator}]\n`));
 }
 
 function printHelp() {
@@ -533,6 +537,7 @@ async function handleQuestion(parsed) {
     durationMs,
   });
 
+  let filterDecision = null;
   try {
     const logRef = appendLog({
       backend: result.backend || config.backend,
@@ -548,9 +553,17 @@ async function handleQuestion(parsed) {
       },
     });
     session.history[session.history.length - 1].logRef = logRef;
+    filterDecision = await triggerAutoFilterAndWait({
+      question: parsed.question,
+      answer,
+      mode: parsed.mode,
+      model: result.mode.model,
+    });
   } catch (error) {
     console.error(chalk.yellow(`Log warning: ${error.message}`));
   }
+
+  printFooter(durationMs, usage, filterDecision);
 }
 
 export async function runCli() {

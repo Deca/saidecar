@@ -102,20 +102,10 @@ async function processAutoFilterQueue() {
       });
 
       if (result) {
-        const metadata = formatAutoFilterMetadata(result);
-        if (metadata) {
-          const filterFile = getLogFilePath();
-          const filterLine = JSON.stringify({
-            timestamp: new Date().toISOString(),
-            type: "auto_filter",
-            ...metadata,
-          });
-          const filterEntry = { question: entry.question, answer: entry.answer };
-          console.log(`[auto-filter] ${result.decision}: ${entry.question?.slice(0, 50)}...`);
-        }
+        formatAutoFilterMetadata(result);
       }
     } catch (error) {
-      console.error("[auto-filter] Scoring failed:", error.message);
+      // Silently fail - auto-filter is best-effort
     }
   }
 
@@ -124,15 +114,39 @@ async function processAutoFilterQueue() {
 
 function triggerAutoFilter(entry) {
   if (!config.autoFilterEnabled) {
-    return;
+    return null;
   }
 
   if (!entry.question || !entry.answer) {
-    return;
+    return null;
   }
 
   autoFilterQueue.push(entry);
   setImmediate(processAutoFilterQueue);
+  return null;
+}
+
+export async function triggerAutoFilterAndWait(entry) {
+  if (!config.autoFilterEnabled) {
+    return null;
+  }
+
+  if (!entry.question || !entry.answer) {
+    return null;
+  }
+
+  try {
+    const { scoreEntry } = await import("./autoFilter.js");
+    const result = await scoreEntry({
+      question: entry.question,
+      answer: entry.answer,
+      mode: entry.mode,
+      model: entry.model,
+    });
+    return result?.decision || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function appendLogAsync(entry) {
