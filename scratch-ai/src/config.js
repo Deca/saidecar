@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-function expandHome(inputPath) {
+export function expandHome(inputPath) {
   if (!inputPath) {
     return inputPath;
   }

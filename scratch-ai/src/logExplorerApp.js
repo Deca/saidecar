@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { getFilterOptions, refreshIndex, searchEntries } from "./logIndex.js";
 import { annotateEntry } from "./annotations.js";
+import { wrapText } from "./textUtils.js";
+import { blockPatterns, stripInlineMarkdown } from "./markdownUtils.js";
 
 const h = React.createElement;
 const dateFilters = ["today", "7d", "30d", "all"];
@@ -34,7 +36,11 @@ export function LogExplorerApp({ initialStats }) {
   const [detailOffset, setDetailOffset] = useState(0);
   const [focusIndex, setFocusIndex] = useState(0);
   const [stats, setStats] = useState(initialStats);
-  const [options, setOptions] = useState(() => getFilterOptions());
+  const [options, setOptions] = useState({ modes: [], backends: [], projects: [], tags: [] });
+
+  useEffect(() => {
+    setOptions(getFilterOptions());
+  }, []);
 
   const modeOptions = useMemo(() => ["all", ...options.modes], [options.modes]);
   const backendOptions = useMemo(() => ["all", ...options.backends], [options.backends]);
@@ -348,17 +354,17 @@ export function markdownDetailLines(markdown) {
 }
 
 function markdownLine(line) {
-  const heading = /^(#{1,6})\s+(.+?)\s*#*$/.exec(line);
+  const heading = blockPatterns.heading.exec(line);
   if (heading) {
     return { color: palette.gold, bold: true, text: stripInlineMarkdown(heading[2]) };
   }
 
-  const blockquote = /^(\s*)>\s?(.*)$/.exec(line);
+  const blockquote = blockPatterns.blockquote.exec(line);
   if (blockquote) {
     return { color: palette.cyan, text: `${blockquote[1]}| ${stripInlineMarkdown(blockquote[2])}` };
   }
 
-  const task = /^(\s*)-\s+\[([ xX])\]\s+(.+)$/.exec(line);
+  const task = blockPatterns.task.exec(line);
   if (task) {
     return {
       color: palette.paper,
@@ -366,32 +372,22 @@ function markdownLine(line) {
     };
   }
 
-  const unordered = /^(\s*)([-*+])\s+(.+)$/.exec(line);
+  const unordered = blockPatterns.unordered.exec(line);
   if (unordered) {
     return { color: palette.paper, text: `${unordered[1]}- ${stripInlineMarkdown(unordered[3])}` };
   }
 
-  const ordered = /^(\s*)(\d+)\.\s+(.+)$/.exec(line);
+  const ordered = blockPatterns.ordered.exec(line);
   if (ordered) {
     return { color: palette.paper, text: `${ordered[1]}${ordered[2]}. ${stripInlineMarkdown(ordered[3])}` };
   }
 
-  const tableSeparator = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+  const tableSeparator = blockPatterns.tableSeparator.test(line);
   if (tableSeparator) {
     return { color: palette.slate, text: line };
   }
 
   return { color: palette.paper, text: stripInlineMarkdown(line) };
-}
-
-function stripInlineMarkdown(text) {
-  return String(text || "")
-    .replace(/`([^`\n]+)`/g, "$1")
-    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1 ($2)")
-    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
-    .replace(/__([^_\n]+)__/g, "$1")
-    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "$1")
-    .replace(/(?<!_)_([^_\n]+)_(?!_)/g, "$1");
 }
 
 function renderDetailLine(line, key, highlightTerms) {
@@ -496,34 +492,7 @@ function renderHighlightedText({
 
 function wrapForDetail(text) {
   const width = Math.max(40, Math.min(process.stdout.columns || 100, 120) - 48);
-  const lines = [];
-
-  for (const rawLine of text.split(/\r?\n/)) {
-    let line = "";
-    const words = rawLine.split(/\s+/).filter(Boolean);
-
-    if (words.length === 0) {
-      lines.push("");
-      continue;
-    }
-
-    for (const word of words) {
-      if (!line) {
-        line = word;
-      } else if ((line + " " + word).length <= width) {
-        line += ` ${word}`;
-      } else {
-        lines.push(line);
-        line = word;
-      }
-    }
-
-    if (line) {
-      lines.push(line);
-    }
-  }
-
-  return lines;
+  return wrapText(text, width);
 }
 
 function modeColorName(mode) {

@@ -5,6 +5,11 @@ import { systemPrompt } from "./prompt.js";
 import { buildQuestionWithContext } from "./sessionContext.js";
 
 function createClient() {
+  if (!config.apiKey) {
+    throw new Error(
+      "Missing OPENAI_API_KEY. Add it to your environment or create .env from .env.example."
+    );
+  }
   return new OpenAI({ apiKey: config.apiKey });
 }
 

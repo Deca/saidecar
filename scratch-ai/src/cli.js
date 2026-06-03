@@ -1,8 +1,10 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import crypto from "node:crypto";
 import chalk from "chalk";
 import { askModel } from "./modelClient.js";
 import { config, validateConfig } from "./config.js";
+import { wrapText } from "./textUtils.js";
 import { appendLog, getLogFilePath } from "./logger.js";
 import { modes, parseInput } from "./modes.js";
 import { renderMarkdownForTerminal } from "./terminalMarkdown.js";
@@ -30,7 +32,7 @@ const ui = {
 };
 
 const session = {
-  id: new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14),
+  id: crypto.randomUUID().replace(/-/g, ""),
   startedAt: new Date(),
   exchanges: 0,
   errors: 0,
@@ -99,37 +101,6 @@ function printBlockDivider() {
 
 function printSoftDivider() {
   console.log(ui.dim(".".repeat(Math.min(process.stdout.columns || 72, 88))));
-}
-
-function wrapText(text, width) {
-  const lines = [];
-
-  for (const rawLine of text.split(/\r?\n/)) {
-    const words = rawLine.split(/\s+/).filter(Boolean);
-    let line = "";
-
-    if (words.length === 0) {
-      lines.push("");
-      continue;
-    }
-
-    for (const word of words) {
-      if (!line) {
-        line = word;
-      } else if ((line + " " + word).length <= width) {
-        line += ` ${word}`;
-      } else {
-        lines.push(line);
-        line = word;
-      }
-    }
-
-    if (line) {
-      lines.push(line);
-    }
-  }
-
-  return lines;
 }
 
 function printUserBlock(text) {
@@ -236,6 +207,8 @@ ${chalk.bold("Session commands")}
   /clear
   /reset
   /exit
+  /quit
+  :q
 
 ${chalk.bold("Logs")}
   ${getLogFilePath()}

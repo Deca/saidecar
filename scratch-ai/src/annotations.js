@@ -1,17 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
-
-function dateStamp(date = new Date()) {
-  return date.toISOString().slice(0, 10);
-}
+import { getDateStamp } from "./dateUtils.js";
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
 export function getAnnotationFilePath(date = new Date(), annotationDir = config.annotationDir) {
-  return path.join(annotationDir, `${dateStamp(date)}.jsonl`);
+  return path.join(annotationDir, `${getDateStamp(date)}.jsonl`);
 }
 
 export function normalizeTags(tags = []) {

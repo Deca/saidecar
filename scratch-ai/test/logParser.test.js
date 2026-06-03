@@ -59,7 +59,7 @@ test("extractSources reads markdown links, numbered sources, and raw citations",
     sources.map((source) => source.url).sort(),
     [
       "https://openai.com/codex",
-      "https://openai.com/news",
+      "https://openai.com/news.",
       "https://sqlite.org/fts5.html",
     ]
   );

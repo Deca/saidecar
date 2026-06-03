@@ -348,6 +348,18 @@ q quit from list/detail
 ctrl+c quit anywhere
 ```
 
+## Index Architecture
+
+JSONL files are the canonical log. SQLite FTS5 is a **derived search index** - it is built on first query and incrementally updated when files change. You can delete `scratch-ai.sqlite` at any time; it rebuilds automatically from the JSONL archive.
+
+| File | Purpose | Lifespan |
+|------|---------|----------|
+| `YYYY-MM-DD.jsonl` | Canonical log | Append-only, permanent |
+| `scratch-ai.sqlite` | Search index | Rebuildable cache |
+| `annotations/*.jsonl` | Favorites/tags | Append-only |
+
+The index auto-refreshes when you run `scratch-logs` or `scratch-digest`. Press `r` in the log explorer to force a manual reindex.
+
 ## Saved Entries And Tags
 
 Raw Q&A logs stay append-only under `SCRATCH_AI_LOG_DIR`. Favorites, tags, and notes are stored separately as append-only JSONL under:

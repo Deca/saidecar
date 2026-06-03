@@ -21,6 +21,37 @@ test("selectSessionContext keeps recent exchanges in original order", () => {
   );
 });
 
+test("selectSessionContext respects maxChars limit before first entry", () => {
+  const largeEntry = { index: 1, mode: "normal", question: "A".repeat(500), answer: "B".repeat(500) };
+  const smallEntry = { index: 2, mode: "normal", question: "small", answer: "tiny" };
+  const selected = selectSessionContext([largeEntry, smallEntry], { maxExchanges: 2, maxChars: 100 });
+
+  assert.deepEqual(selected.map((e) => e.index), [2]);
+});
+
+test("selectSessionContext skips entries with missing question or answer", () => {
+  const mixedHistory = [
+    { index: 1, mode: "normal", question: "", answer: "Has answer" },
+    { index: 2, mode: "normal", question: "Has question", answer: "" },
+    { index: 3, mode: "normal", question: "Full", answer: "Entry" },
+  ];
+  const selected = selectSessionContext(mixedHistory, { maxExchanges: 5, maxChars: 10000 });
+  assert.deepEqual(selected.map((e) => e.index), [3]);
+});
+
+test("selectSessionContext returns empty when all entries invalid", () => {
+  const emptyHistory = [
+    { index: 1, mode: "normal", question: "", answer: "" },
+  ];
+  const selected = selectSessionContext(emptyHistory, { maxExchanges: 5, maxChars: 10000 });
+  assert.deepEqual(selected, []);
+});
+
+test("selectSessionContext handles empty history", () => {
+  const selected = selectSessionContext([], { maxExchanges: 5, maxChars: 10000 });
+  assert.deepEqual(selected, []);
+});
+
 test("formatSessionContext and buildQuestionWithContext include prior turns", () => {
   const selected = selectSessionContext(history, { maxExchanges: 1, maxChars: 1000 });
   const formatted = formatSessionContext(selected);

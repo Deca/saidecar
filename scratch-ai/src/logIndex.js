@@ -3,11 +3,19 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.js";
 import { parseJsonlLine } from "./logParser.js";
+import { parseJson } from "./parseUtils.js";
 import { annotationState, entryKey } from "./annotations.js";
 
 export function openLogIndex(indexPath = config.indexPath) {
   fs.mkdirSync(path.dirname(indexPath), { recursive: true });
-  const db = new DatabaseSync(indexPath);
+  let db;
+  try {
+    db = new DatabaseSync(indexPath);
+  } catch (error) {
+    throw new Error(
+      `Failed to open index ${indexPath}. If the file is corrupt, delete it and re-runscratch-digest or scratch-log. Cause: ${error.message}`
+    );
+  }
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
   ensureSchema(db);
@@ -108,9 +116,9 @@ function indexFileIfChanged(db, file, stats) {
     .all(file)
     .map((row) => row.id);
 
-  const deleteFts = db.prepare("DELETE FROM entries_fts WHERE entry_id = ?");
-  for (const id of existingIds) {
-    deleteFts.run(id);
+  if (existingIds.length > 0) {
+    const placeholders = existingIds.map(() => "?").join(",");
+    db.prepare(`DELETE FROM entries_fts WHERE entry_id IN (${placeholders})`).run(...existingIds);
   }
   db.prepare("DELETE FROM entries WHERE log_file = ?").run(file);
 
@@ -313,18 +321,6 @@ function rowToEntry(row, annotations = new Map()) {
     notes: annotation.notes,
     annotations: annotation.annotations,
   };
-}
-
-function parseJson(value) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
 }
 
 function buildFtsQuery(query) {

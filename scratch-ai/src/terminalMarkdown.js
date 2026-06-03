@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { blockPatterns, inlineMarkdownPatterns } from "./markdownUtils.js";
 
 const theme = {
   heading: chalk.hex("#C084FC").bold,
@@ -12,18 +13,18 @@ const theme = {
 
 function renderInlineMarkdown(text) {
   return text
-    .replace(/`([^`\n]+)`/g, (_, code) => theme.code(code))
-    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, label, url) => {
+    .replace(inlineMarkdownPatterns.code, (_, code) => theme.code(code))
+    .replace(inlineMarkdownPatterns.link, (_, label, url) => {
       return `${theme.link(label)} ${theme.marker(`(${url})`)}`;
     })
-    .replace(/\*\*([^*\n]+)\*\*/g, (_, content) => theme.strong(content))
-    .replace(/__([^_\n]+)__/g, (_, content) => theme.strong(content))
-    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, (_, content) => theme.emphasis(content))
-    .replace(/(?<!_)_([^_\n]+)_(?!_)/g, (_, content) => theme.emphasis(content));
+    .replace(inlineMarkdownPatterns.bold, (_, content) => theme.strong(content))
+    .replace(inlineMarkdownPatterns.underlineBold, (_, content) => theme.strong(content))
+    .replace(inlineMarkdownPatterns.emphasis, (_, content) => theme.emphasis(content))
+    .replace(inlineMarkdownPatterns.underlineEmphasis, (_, content) => theme.emphasis(content));
 }
 
 function renderTableSeparator(line) {
-  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line)
+  return blockPatterns.tableSeparator.test(line)
     ? theme.marker(line)
     : null;
 }
@@ -34,28 +35,28 @@ function renderMarkdownLine(line) {
     return tableSeparator;
   }
 
-  const heading = /^(#{1,6})\s+(.+?)\s*#*$/.exec(line);
+  const heading = blockPatterns.heading.exec(line);
   if (heading) {
     return theme.heading(renderInlineMarkdown(heading[2]));
   }
 
-  const blockquote = /^(\s*)>\s?(.*)$/.exec(line);
+  const blockquote = blockPatterns.blockquote.exec(line);
   if (blockquote) {
     return `${blockquote[1]}${theme.quote("|")} ${chalk.hex("#D6F5FF")(renderInlineMarkdown(blockquote[2]))}`;
   }
 
-  const task = /^(\s*)-\s+\[([ xX])\]\s+(.+)$/.exec(line);
+  const task = blockPatterns.task.exec(line);
   if (task) {
     const box = task[2].trim() ? "[x]" : "[ ]";
     return `${task[1]}${theme.marker(box)} ${renderInlineMarkdown(task[3])}`;
   }
 
-  const unordered = /^(\s*)([-*+])\s+(.+)$/.exec(line);
+  const unordered = blockPatterns.unordered.exec(line);
   if (unordered) {
     return `${unordered[1]}${theme.marker("-")} ${renderInlineMarkdown(unordered[3])}`;
   }
 
-  const ordered = /^(\s*)(\d+)\.\s+(.+)$/.exec(line);
+  const ordered = blockPatterns.ordered.exec(line);
   if (ordered) {
     return `${ordered[1]}${theme.marker(`${ordered[2]}.`)} ${renderInlineMarkdown(ordered[3])}`;
   }
@@ -69,7 +70,7 @@ export function renderMarkdownForTerminal(markdown) {
   let inFence = false;
 
   for (const line of lines) {
-    const fence = /^(\s*)(`{3,}|~{3,})(.*)$/.exec(line);
+    const fence = blockPatterns.fence.exec(line);
     if (fence) {
       if (inFence) {
         inFence = false;

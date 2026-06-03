@@ -24,6 +24,10 @@ export function selectSessionContext(
       continue;
     }
 
+    if (entryChars > maxChars) {
+      break;
+    }
+
     if (selected.length > 0 && usedChars + entryChars > maxChars) {
       break;
     }

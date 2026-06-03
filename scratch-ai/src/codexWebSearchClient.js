@@ -32,7 +32,7 @@ function readCodexAuth() {
 
   if (!token || !accountId) {
     throw new CodexSearchError(
-      "Codex OAuth token or account id is missing. Run `codex login` again."
+      "Codex authentication is incomplete. Run `codex login` again."
     );
   }
 
@@ -152,7 +152,14 @@ async function* parseSse(body) {
   let buffer = "";
 
   while (true) {
-    const { done, value } = await reader.read();
+    let result;
+    try {
+      result = await reader.read();
+    } catch (error) {
+      break;
+    }
+
+    const { done, value } = result;
     if (done) {
       break;
     }

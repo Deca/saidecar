@@ -121,7 +121,7 @@ function extractSourcesFromAnswer(answer) {
 }
 
 function stripTrailingPunctuation(url) {
-  return url.replace(/[),.;]+$/, "");
+  return url.replace(/[)\]]+$/, "");
 }
 
 function stringOrEmpty(value) {
