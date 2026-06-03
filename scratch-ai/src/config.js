@@ -30,12 +30,15 @@ function defaultBrainPath(logDir, childDir) {
 
 export const config = {
   apiKey: process.env.OPENAI_API_KEY,
+  provider: (process.env.SCRATCH_AI_PROVIDER || "openai").toLowerCase(),
+  providerApiKey: process.env.PROVIDER_API_KEY,
+  providerBaseUrl: process.env.PROVIDER_BASE_URL,
   backend: (process.env.SCRATCH_AI_BACKEND || "openai").toLowerCase(),
-  defaultModel: process.env.SCRATCH_AI_MODEL || "gpt-5.4-mini",
+  defaultModel: process.env.SCRATCH_AI_MODEL || "gpt-4o-mini",
   thinkModel:
     process.env.SCRATCH_AI_THINK_MODEL ||
     process.env.SCRATCH_AI_MODEL ||
-    "gpt-5.4-mini",
+    "gpt-4o-mini",
   codexCommand: process.env.SCRATCH_AI_CODEX_COMMAND || "codex",
   codexTimeoutMs: Number.parseInt(
     process.env.SCRATCH_AI_CODEX_TIMEOUT_MS || "120000",
@@ -64,14 +67,34 @@ export const config = {
   timezone: process.env.SCRATCH_AI_TIMEZONE || "Europe/Rome",
 };
 
+import { PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_ANTHROPIC, KNOWN_PROVIDERS } from "./providers/index.js";
+
 export function validateConfig() {
   if (!["openai", "codex"].includes(config.backend)) {
     throw new Error('SCRATCH_AI_BACKEND must be either "openai" or "codex".');
   }
 
-  if (config.backend === "openai" && !config.apiKey) {
+  if (!KNOWN_PROVIDERS.includes(config.provider)) {
+    throw new Error(
+      `SCRATCH_AI_PROVIDER must be one of: ${KNOWN_PROVIDERS.join(", ")}.`
+    );
+  }
+
+  if (config.backend === "openai" && config.provider === PROVIDER_OPENAI && !config.apiKey) {
     throw new Error(
       "Missing OPENAI_API_KEY. Add it to your environment or create .env from .env.example."
+    );
+  }
+
+  if (config.provider === PROVIDER_DEEPSEEK && !config.providerApiKey) {
+    throw new Error(
+      "Missing DEEPSEEK_API_KEY (via PROVIDER_API_KEY). Add it to your environment or create .env from .env.example."
+    );
+  }
+
+  if (config.provider === PROVIDER_ANTHROPIC && !config.providerApiKey) {
+    throw new Error(
+      "Missing ANTHROPIC_API_KEY (via PROVIDER_API_KEY). Add it to your environment or create .env from .env.example."
     );
   }
 

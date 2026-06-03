@@ -18,11 +18,12 @@ export function selectSessionContext(
 
     const question = String(item.question || "").trim();
     const answer = String(item.answer || "").trim();
-    const entryChars = question.length + answer.length;
 
     if (!question || !answer) {
       continue;
     }
+
+    const entryChars = question.length + answer.length;
 
     if (entryChars > maxChars) {
       break;
