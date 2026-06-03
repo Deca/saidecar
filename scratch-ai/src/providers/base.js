@@ -121,15 +121,17 @@ export function buildChatRequest(provider, { model, systemPrompt, question, tool
 export async function parseProviderResponse(provider, response, backend) {
   if (isAnthropicCompatible(provider)) {
     let text = "";
+    let thinking = "";
     for (const block of response.content) {
       if (block.type === "text") {
         text += block.text;
       } else if (block.type === "thinking") {
-        text += `<thinking>\n${block.thinking}\n</thinking>`;
+        thinking += block.thinking;
       }
     }
     return {
       answer: text,
+      thinking,
       raw: response,
       usage: {
         inputTokens: response.usage.input_tokens,

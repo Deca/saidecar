@@ -153,6 +153,7 @@ PROVIDER_BASE_URL=              # Optional custom endpoint URL
 # MiniMax OAuth (optional)
 MINIMAX_API_KEY=                 # API key if not using mmx CLI
 MINIMAX_BASE_URL=               # Optional (auto-detected from key prefix)
+MINIMAX_AUTH_MODE=oauth         # "oauth" (default) or "api_key"
 
 # Backend
 SCRATCH_AI_BACKEND=openai        # openai or codex
@@ -163,6 +164,9 @@ OPENAI_API_KEY=
 # Models
 SCRATCH_AI_MODEL=gpt-4o-mini
 SCRATCH_AI_THINK_MODEL=gpt-4o-mini
+
+# Thinking display (for models like MiniMax-M3 that output thinking)
+SCRATCH_AI_SHOW_THINKING=false    # true to show thinking blocks, false to hide (default: false)
 
 # Codex
 SCRATCH_AI_CODEX_COMMAND=codex

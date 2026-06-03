@@ -524,7 +524,14 @@ async function handleQuestion(parsed) {
   printAnswerHeader(result);
   console.log("");
   console.log(answer ? renderMarkdownForTerminal(answer) : chalk.yellow("(empty answer)"));
-  printFooter(durationMs, usage);
+
+  // Show thinking if enabled and available
+  if (result.thinking && config.showThinking) {
+    console.log("");
+    console.log(chalk.dim("--- thinking ---"));
+    console.log(chalk.dim(renderMarkdownForTerminal(result.thinking)));
+    console.log(chalk.dim("---"));
+  }
 
   session.exchanges += 1;
   session.webCalls += parsed.mode === "web" || parsed.mode === "deepweb" ? 1 : 0;

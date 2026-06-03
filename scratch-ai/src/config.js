@@ -69,6 +69,7 @@ export const config = {
   project: process.env.SCRATCH_AI_PROJECT || "general",
   timezone: process.env.SCRATCH_AI_TIMEZONE || "Europe/Rome",
   autoFilterEnabled: process.env.SCRATCH_AI_AUTO_FILTER === "true",
+  showThinking: process.env.SCRATCH_AI_SHOW_THINKING === "true",
 };
 
 import { PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_ANTHROPIC, PROVIDER_MINIMAX, KNOWN_PROVIDERS } from "./providers/index.js";
