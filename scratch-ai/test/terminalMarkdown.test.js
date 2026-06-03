@@ -37,3 +37,10 @@ test("renderMarkdownForTerminal keeps fenced code content readable", () => {
   assert.match(output, /const value = `literal`;/);
   assert.doesNotMatch(output, /\ncode$/);
 });
+
+test("renderMarkdownForTerminal renders horizontal rules as a divider line", () => {
+  const output = renderMarkdownForTerminal("Section A\n\n---\n\nSection B");
+  assert.match(output, /Section A/);
+  assert.match(output, /Section B/);
+  assert.match(output, /─{3,}/);
+});

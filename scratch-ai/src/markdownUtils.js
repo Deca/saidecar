@@ -14,6 +14,7 @@ export const blockPatterns = {
   unordered: /^(\s*)([-*+])\s+(.+)$/,
   ordered: /^(\s*)(\d+)\.\s+(.+)$/,
   tableSeparator: /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/,
+  horizontalRule: /^(\s*)([-*_])\s*\2\s*\2[\s\2]*$|^\s*([-*_]{3,})\s*$/,
   fence: /^(\s*)(`{3,}|~{3,})(.*)$/,
 };
 

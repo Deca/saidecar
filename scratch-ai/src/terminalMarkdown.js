@@ -35,6 +35,10 @@ function renderMarkdownLine(line) {
     return tableSeparator;
   }
 
+  if (blockPatterns.horizontalRule.test(line)) {
+    return theme.marker("─".repeat(Math.max(3, line.trim().length)));
+  }
+
   const heading = blockPatterns.heading.exec(line);
   if (heading) {
     return theme.heading(renderInlineMarkdown(heading[2]));

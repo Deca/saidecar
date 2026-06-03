@@ -4,6 +4,7 @@ import { getFilterOptions, refreshIndex, searchEntries } from "./logIndex.js";
 import { annotateEntry } from "./annotations.js";
 import { wrapText } from "./textUtils.js";
 import { blockPatterns, stripInlineMarkdown } from "./markdownUtils.js";
+import { APP_DISPLAY_NAME } from "./config.js";
 
 const h = React.createElement;
 const dateFilters = ["today", "7d", "30d", "all"];
@@ -220,7 +221,7 @@ function Header({ query, mode, backend, project, date, savedOnly, tag, importanc
   return h(
     Box,
     { flexDirection: "column", marginBottom: 1 },
-    h(Text, { color: palette.gold, bold: true }, "Scratch AI Log Explorer"),
+    h(Text, { color: palette.gold, bold: true }, `${APP_DISPLAY_NAME} Log Explorer`),
     h(
       Text,
       null,
@@ -342,11 +343,14 @@ function detailLines(entry) {
 }
 
 export function markdownDetailLines(markdown) {
+  if (markdown == null || markdown === "") {
+    return [];
+  }
   const rendered = [];
   let inFence = false;
 
-  for (const rawLine of String(markdown || "").split(/\r?\n/)) {
-    const fence = /^(\s*)(`{3,}|~{3,})(.*)$/.exec(rawLine);
+  for (const rawLine of String(markdown).split(/\r?\n/)) {
+    const fence = blockPatterns.fence.exec(rawLine);
     if (fence) {
       inFence = !inFence;
       if (inFence) {
@@ -360,6 +364,11 @@ export function markdownDetailLines(markdown) {
 
     if (inFence) {
       rendered.push(...wrapForDetail(rawLine).map((text) => ({ color: palette.straw, text })));
+      continue;
+    }
+
+    if (blockPatterns.horizontalRule.test(rawLine)) {
+      rendered.push({ color: palette.slate, text: "─".repeat(8) });
       continue;
     }
 

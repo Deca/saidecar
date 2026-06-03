@@ -33,6 +33,36 @@ test("markdownDetailLines renders common assistant markdown as display lines", (
   assert.doesNotMatch(text, /`renderer`/);
 });
 
+test("markdownDetailLines renders horizontal rules and preserves multi-line fence content", () => {
+  const lines = markdownDetailLines(
+    [
+      "Intro line",
+      "",
+      "---",
+      "",
+      "```",
+      "line 1",
+      "  indented line 2",
+      "```",
+      "",
+      "***",
+    ].join("\n")
+  );
+
+  const text = lines.map((line) => line.text).join("\n");
+  assert.match(text, /Intro line/);
+  assert.match(text, /─+/);
+  assert.match(text, /line 1/);
+  assert.match(text, /indented line 2/);
+  assert.doesNotMatch(text, /\*\*/);
+});
+
+test("markdownDetailLines handles empty and nullish input", () => {
+  assert.deepEqual(markdownDetailLines(""), []);
+  assert.deepEqual(markdownDetailLines(null), []);
+  assert.deepEqual(markdownDetailLines(undefined), []);
+});
+
 test("searchTerms and splitHighlightedText identify query matches", () => {
   assert.deepEqual(searchTerms("sqlite SQLite fts"), ["sqlite", "fts"]);
 
