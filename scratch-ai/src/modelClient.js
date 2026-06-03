@@ -1,6 +1,5 @@
 import { config } from "./config.js";
 import { askCodex } from "./codexClient.js";
-import { askCodexWebSearch } from "./codexWebSearchClient.js";
 import { askWebSearch } from "./webSearchClient.js";
 import { askOpenAIProvider } from "./providers/openaiProvider.js";
 import { askDeepSeekProvider } from "./providers/deepseekProvider.js";
@@ -13,15 +12,11 @@ import { modes } from "./modes.js";
 export async function askModel({ question, modeName, sessionContext = [] }) {
   const mode = modes[modeName] || modes.normal;
 
-  // Web search mode (uses SearXNG, falls back to DuckDuckGo)
-  if (mode.tools.length > 0 && config.backend !== "codex") {
+  // Web search mode: use SearXNG-based search + synthesis with the active provider
+  // This ensures the user's chosen model (set via /model or /provider) does the synthesis,
+  // not some other backend. Codex backend is no longer used for web search.
+  if (mode.tools.length > 0) {
     const result = await askWebSearch({ question, modeName, sessionContext });
-    return { ...result, mode };
-  }
-
-  // Codex backend with web search tools
-  if (config.backend === "codex" && mode.tools.length > 0) {
-    const result = await askCodexWebSearch({ question, modeName, sessionContext });
     return { ...result, mode };
   }
 
