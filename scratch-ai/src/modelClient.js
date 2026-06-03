@@ -23,12 +23,14 @@ export async function askModel({ question, modeName, sessionContext = [] }) {
       return { ...result, mode };
     }
     if (config.provider === PROVIDER_MINIMAX && mode.tools.length > 0) {
-      // MiniMax doesn't have a usable web search API - route to OpenAI for web mode
+      // MiniMax doesn't have a usable client-side web search API.
+      // If OpenAI key is available, route to OpenAI provider. Otherwise fall through
+      // to Codex backend which has working web search.
       if (config.apiKey || process.env.OPENAI_API_KEY) {
         const result = await askOpenAIProvider({ question, modeName, sessionContext });
         return { ...result, mode };
       }
-      throw new Error("Web search requires OpenAI API key. Set OPENAI_API_KEY or use a provider with web search.");
+      // Fall through to Codex backend check below
     }
 
     if (config.provider === PROVIDER_MINIMAX) {
