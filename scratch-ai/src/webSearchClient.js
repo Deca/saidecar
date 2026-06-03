@@ -26,7 +26,53 @@ const NEWS_HINTS = ("news,nyheter,headlines,breaking,latest,today,idag").split("
 
 const REQUEST_TIMEOUT = 15000;
 
-async function searxngJsonSearch(query, count, options = {}) {
+// Cache of public SearXNG instances fetched from searx.space
+let instancesCache = null;
+let instancesCacheTime = 0;
+const INSTANCES_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+// Discover public SearXNG instances from searx.space
+// Returns an array of URLs sorted by response time, filtered for healthy instances
+async function discoverPublicInstances() {
+  const now = Date.now();
+  if (instancesCache && (now - instancesCacheTime) < INSTANCES_CACHE_TTL_MS) {
+    return instancesCache;
+  }
+
+  try {
+    const response = await fetch("https://searx.space/data/instances.json", {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      return instancesCache || [];
+    }
+
+    const data = await response.json();
+    const entries = Object.entries(data.instances || {});
+
+    // Filter for healthy, fast instances
+    const healthy = entries
+      .filter(([url, info]) => {
+        const init = info.timing?.initial;
+        return init?.success_percentage > 50 && init?.all?.value < 2.0;
+      })
+      .map(([url, info]) => ({
+        url: url.replace(/\/+$/, ""),
+        time: info.timing.initial.all.value,
+      }))
+      .sort((a, b) => a.time - b.time)
+      .map((entry) => entry.url);
+
+    instancesCache = healthy;
+    instancesCacheTime = now;
+    return healthy;
+  } catch (error) {
+    // Network error or timeout - use stale cache or empty list
+    return instancesCache || [];
+  }
+}
+
+async function searxngJsonSearch(instanceUrl, query, count, options = {}) {
   const { timeRange, categories = "general", engines = DEFAULT_ENGINES, language = "en" } = options;
 
   const params = {
@@ -42,7 +88,7 @@ async function searxngJsonSearch(query, count, options = {}) {
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
-    const response = await fetch(`${SEARXNG_URL}/search`, {
+    const response = await fetch(`${instanceUrl}/search`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(params).toString(),
@@ -76,7 +122,7 @@ function isNewsQuery(query, timeFilter) {
   return NEWS_HINTS.some((h) => q.includes(h));
 }
 
-async function searxngSearch(query, count, timeFilter) {
+async function searxngSearch(instanceUrl, query, count, timeFilter) {
   // Detect news queries - use 'news' category with time filter
   const isNews = isNewsQuery(query, timeFilter);
   const categories = isNews ? "news" : "general";
@@ -85,7 +131,7 @@ async function searxngSearch(query, count, timeFilter) {
     ? (timeFilter === "day" || timeFilter === "week" || !timeFilter) ? "week" : timeFilter
     : null;
 
-  let { results, data } = await searxngJsonSearch(query, count, {
+  let { results, data } = await searxngJsonSearch(instanceUrl, query, count, {
     categories,
     timeRange,
     engines: DEFAULT_ENGINES,
@@ -94,7 +140,7 @@ async function searxngSearch(query, count, timeFilter) {
 
   // Fallback 1: if news returned 0, retry with general engines
   if (results.length === 0 && isNews) {
-    const retry = await searxngJsonSearch(query, count, {
+    const retry = await searxngJsonSearch(instanceUrl, query, count, {
       categories: "general",
       engines: DEFAULT_ENGINES,
       language: "en",
@@ -105,7 +151,7 @@ async function searxngSearch(query, count, timeFilter) {
 
   // Fallback 2: if language-pinned search returned 0, retry without language
   if (results.length === 0) {
-    const retry = await searxngJsonSearch(query, count, {
+    const retry = await searxngJsonSearch(instanceUrl, query, count, {
       categories,
       timeRange,
       engines: DEFAULT_ENGINES,
@@ -117,7 +163,7 @@ async function searxngSearch(query, count, timeFilter) {
 
   // Fallback 3: if pinned engines returned 0, retry with default engines
   if (results.length === 0 && DEFAULT_ENGINES) {
-    const retry = await searxngJsonSearch(query, count, {
+    const retry = await searxngJsonSearch(instanceUrl, query, count, {
       categories,
       timeRange,
       engines: null,
@@ -128,18 +174,18 @@ async function searxngSearch(query, count, timeFilter) {
   }
 
   if (results.length === 0 && data?.unresponsive_engines) {
-    console.log(`[websearch] SearXNG unresponsive engines: ${data.unresponsive_engines.join(", ")}`);
+    console.log(`[websearch] SearXNG ${instanceUrl} unresponsive engines: ${data.unresponsive_engines.join(", ")}`);
   }
 
   return results;
 }
 
-async function searxngHtmlSearch(query, count) {
+async function searxngHtmlSearch(instanceUrl, query, count) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
-    const response = await fetch(`${SEARXNG_URL}/search?q=${encodeURIComponent(query)}`, {
+    const response = await fetch(`${instanceUrl}/search?q=${encodeURIComponent(query)}`, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: controller.signal,
     });
@@ -242,16 +288,14 @@ function formatSearchResults(query, results) {
 }
 
 function getSearxngError() {
-  return `Could not reach SearXNG at ${SEARXNG_URL}.
+  return `Could not reach any SearXNG instance.
 
 To use web search, either:
 1. Run a self-hosted SearXNG instance (recommended):
    docker run -d -p 8080:8080 -e SEARXNG_SECRET=random searxng/searxng
    Then set SEARXNG_URL=http://localhost:8080 in .env
 
-2. Or set SEARXNG_URL to a public instance
-
-3. Or configure a different search provider (see webSearchClient.js)`;
+2. Or set SEARXNG_URL to a public instance (e.g. from https://searx.space)`;
 }
 
 export async function askWebSearch({ question, modeName, sessionContext = [] }) {
@@ -260,19 +304,39 @@ export async function askWebSearch({ question, modeName, sessionContext = [] }) 
   let results;
   let lastError;
 
-  // 1. Try SearXNG JSON API (primary)
-  try {
-    results = await searxngSearch(question, 10);
-  } catch (e) {
-    lastError = e.message;
-  }
+  // Build list of SearXNG instances to try:
+  // 1. SEARXNG_URL env var (or default localhost:8080)
+  // 2. Discovered public instances from searx.space
+  const configuredUrl = SEARXNG_URL;
+  const publicInstances = await discoverPublicInstances();
+  const allInstances = configuredUrl === "http://localhost:8080"
+    ? publicInstances  // No local instance, use public only
+    : [configuredUrl, ...publicInstances];  // Try local first, then public
 
-  // 2. Try SearXNG HTML fallback
-  if (!results || results.length === 0) {
+  // 1. Try SearXNG JSON API on each instance until one works
+  for (const instanceUrl of allInstances) {
+    if (results && results.length > 0) break;
     try {
-      results = await searxngHtmlSearch(question, 10);
+      results = await searxngSearch(instanceUrl, question, 10);
+      if (results.length > 0) {
+        break;
+      }
     } catch (e) {
       lastError = e.message;
+      // Continue to next instance
+    }
+  }
+
+  // 2. Try SearXNG HTML fallback on first available instance
+  if (!results || results.length === 0) {
+    for (const instanceUrl of allInstances) {
+      if (results && results.length > 0) break;
+      try {
+        results = await searxngHtmlSearch(instanceUrl, question, 10);
+        if (results.length > 0) break;
+      } catch (e) {
+        lastError = e.message;
+      }
     }
   }
 
