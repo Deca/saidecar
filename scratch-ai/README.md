@@ -21,6 +21,7 @@ It is intentionally not a coding agent. In direct OpenAI mode it does not scan r
 - Designed for narrow Zellij side panes
 - No repo mutation
 - No shell execution
+- Per-stage response timing shown in the answer footer and `/status`
 
 ## Install
 
@@ -126,6 +127,7 @@ Use `/status` to see the current terminal session:
 - current session context status
 - estimated transcript size for the current terminal session
 - exchange count, errors, web calls, and last latency
+- per-stage breakdown of the last call (`login`, `cli`, `model` milliseconds) on the codex backend
 - API token usage when the direct OpenAI backend reports it
 - current JSONL log file
 
@@ -164,8 +166,8 @@ SCRATCH_AI_BACKEND=openai        # openai or codex
 OPENAI_API_KEY=
 
 # Models
-SCRATCH_AI_MODEL=gpt-4o-mini
-SCRATCH_AI_THINK_MODEL=gpt-4o-mini
+SCRATCH_AI_MODEL=gpt-5.4-mini
+SCRATCH_AI_THINK_MODEL=gpt-5.4-mini
 
 # Thinking display (for models like MiniMax-M3 that output thinking)
 SCRATCH_AI_SHOW_THINKING=false    # true to show thinking blocks, false to hide (default: false)
@@ -625,6 +627,40 @@ With an API key configured:
 ```bash
 npm start
 ```
+
+## Performance
+
+Every answer prints a per-stage timing breakdown in the footer, so you can see where the time is going on slow calls:
+
+```text
+[done 14s | login=0ms cli=1.2s model=12.4s | tokens=320]
+```
+
+| Stage | What it measures | Where the time goes |
+|-------|------------------|---------------------|
+| `login` | `codex login status` check | First call only (~1-2s); cached for 10 min on the codex backend |
+| `cli` | Codex CLI process startup to first stdout byte | Cold-start of the `codex` binary + its own OAuth/auth handshake |
+| `model` | First byte to close — the actual model generation | TTFT + token generation on the model side |
+| `tokens` | Total token usage from the API (when the backend reports it) | — |
+
+### Codex login cache
+
+On the `codex` backend, every request used to spawn a `codex login status` subprocess to verify auth (~1-2s). That check is now cached in memory for **10 minutes** (constant `LOGIN_CHECK_TTL_MS` in `src/codexClient.js`). The first call in a session still runs the check; subsequent calls within 10 min skip the subprocess. In-flight requests are de-duplicated, so two simultaneous questions share one login check.
+
+If you want to force a fresh check (e.g. after `codex login` in another terminal), the cache resets when the process restarts. There is no env-var override — restart the CLI to flush.
+
+### Model selection for latency
+
+Default `gpt-5.4-mini` is the current OpenAI "strongest mini" model and is the best choice for fast Q&A. If a request is consistently slow:
+
+1. Check the `[done ... | login=... cli=... model=...]` line to see which stage dominates.
+2. If `model` is large (≥10s), try `gpt-5.4-nano` for cheaper/faster responses, or switch backend to a provider with lower round-trip latency (MiniMax M2.7 is reported at ~2-3s end-to-end).
+3. If `cli` is large (>3s on every call), check that the `codex` binary is on `PATH` and not being re-resolved through `cmd.exe` on Windows.
+4. The `login` value is the easiest win — it should be `0ms` on warm cache. If you see `login=1500ms` on every call, the cache is being invalidated more often than expected (e.g. by restarting the CLI between questions).
+
+### Known follow-up
+
+Streaming the `codex exec --json` event stream (token-by-token output) is the largest remaining perceived-perf win on the codex backend. It is tracked as a follow-up to task #24 and is not in the current release.
 
 Then try:
 
