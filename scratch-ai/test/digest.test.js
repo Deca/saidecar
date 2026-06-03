@@ -3,7 +3,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { renderDigestMarkdown, isoWeekRange, renderWeeklyDigestMarkdown, weeklyFileName } from "../src/digest.js";
+import {
+  renderDigestMarkdown,
+  isoWeekRange,
+  renderWeeklyDigestMarkdown,
+  weeklyFileName,
+  weekStartFromIso,
+  findLatestWeekly,
+  isStaleWeekly,
+  describeWeeklyStatus,
+} from "../src/digest.js";
 import { refreshIndex, searchEntries } from "../src/logIndex.js";
 import { formatEntriesMarkdown, formatEntriesText } from "../src/logExport.js";
 import { parseInput } from "../src/modes.js";
@@ -244,4 +253,83 @@ test("searchEntries honors since/until range across the weekly window", () => {
   assert.equal(inside[0].question, "Entry inside the week");
 
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("weekStartFromIso maps ISO year/week back to the Monday", () => {
+  const w1 = weekStartFromIso(2026, 1);
+  assert.equal(w1.toISOString().slice(0, 10), "2025-12-29");
+
+  const w23 = weekStartFromIso(2026, 23);
+  assert.equal(w23.toISOString().slice(0, 10), "2026-06-01");
+
+  const w52 = weekStartFromIso(2025, 1);
+  assert.equal(w52.toISOString().slice(0, 10), "2024-12-30");
+
+  assert.throws(() => weekStartFromIso(2026, 0), /Invalid ISO week/);
+  assert.throws(() => weekStartFromIso(2026, 54), /Invalid ISO week/);
+});
+
+test("findLatestWeekly returns the most recent weekly file and ignores unrelated files", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-weekly-latest-"));
+  fs.writeFileSync(path.join(dir, "weekly-2026-W22.md"), "old");
+  fs.writeFileSync(path.join(dir, "weekly-2026-W23.md"), "current");
+  fs.writeFileSync(path.join(dir, "2026-06-01.md"), "daily");
+  fs.writeFileSync(path.join(dir, "weekly-2026-W99.md"), "ignored");
+
+  const latest = findLatestWeekly({ sessionDir: dir });
+  assert.ok(latest);
+  assert.equal(latest.isoYear, 2026);
+  assert.equal(latest.isoWeek, 23);
+  assert.equal(latest.file, "weekly-2026-W23.md");
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("findLatestWeekly returns null when no weekly files exist", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-weekly-empty-"));
+  fs.writeFileSync(path.join(dir, "2026-06-01.md"), "daily only");
+  assert.equal(findLatestWeekly({ sessionDir: dir }), null);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("isStaleWeekly flags missing, stale, and fresh states", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-weekly-stale-"));
+
+  const currentRange = isoWeekRange({ referenceDate: "2026-06-03" });
+
+  const missing = isStaleWeekly({ sessionDir: dir, currentRange });
+  assert.equal(missing.stale, true);
+  assert.equal(missing.reason, "no-prior-weekly");
+  assert.equal(missing.last, null);
+
+  fs.writeFileSync(path.join(dir, "weekly-2026-W22.md"), "last week");
+  const stale = isStaleWeekly({ sessionDir: dir, currentRange });
+  assert.equal(stale.stale, true);
+  assert.equal(stale.reason, "stale");
+  assert.equal(stale.last.isoWeek, 22);
+
+  fs.writeFileSync(path.join(dir, "weekly-2026-W23.md"), "this week");
+  const fresh = isStaleWeekly({ sessionDir: dir, currentRange });
+  assert.equal(fresh.stale, false);
+  assert.equal(fresh.reason, "fresh");
+  assert.equal(fresh.last.isoWeek, 23);
+  assert.equal(fresh.ageDays, 0);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("describeWeeklyStatus produces human-friendly lines for each state", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-weekly-msg-"));
+  const currentRange = isoWeekRange({ referenceDate: "2026-06-03" });
+
+  const empty = describeWeeklyStatus({ sessionDir: dir, currentRange });
+  assert.match(empty.line, /No weekly digest found yet/);
+  assert.match(empty.line, /Current week: 2026-W23/);
+
+  fs.writeFileSync(path.join(dir, "weekly-2026-W23.md"), "this week");
+  const fresh = describeWeeklyStatus({ sessionDir: dir, currentRange });
+  assert.match(fresh.line, /up to date/);
+  assert.match(fresh.line, /2026-W23/);
+
+  fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -144,6 +144,100 @@ export function writeDigest(markdown, date = todayStamp(), sessionDir = config.s
   return file;
 }
 
+const WEEKLY_FILE_PATTERN = /^weekly-(\d{4})-W(\d{2})\.md$/;
+
+export function weekStartFromIso(isoYear, isoWeek) {
+  if (!Number.isInteger(isoYear) || !Number.isInteger(isoWeek) || isoWeek < 1 || isoWeek > 53) {
+    throw new Error(`Invalid ISO week: ${isoYear}-W${isoWeek}`);
+  }
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+  const dayNum = jan4.getUTCDay() || 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - (dayNum - 1));
+  monday.setUTCDate(monday.getUTCDate() + (isoWeek - 1) * 7);
+  return monday;
+}
+
+export function findLatestWeekly({ sessionDir = config.sessionDir } = {}) {
+  if (!fs.existsSync(sessionDir)) {
+    return null;
+  }
+  const candidates = [];
+  for (const name of fs.readdirSync(sessionDir)) {
+    const match = name.match(WEEKLY_FILE_PATTERN);
+    if (!match) continue;
+    const isoYear = Number(match[1]);
+    const isoWeek = Number(match[2]);
+    if (isoWeek < 1 || isoWeek > 53) continue;
+    candidates.push({ name, isoYear, isoWeek });
+  }
+  if (!candidates.length) {
+    return null;
+  }
+  candidates.sort((a, b) => b.isoYear - a.isoYear || b.isoWeek - a.isoWeek);
+  const winner = candidates[0];
+  const fullPath = path.join(sessionDir, winner.name);
+  const stat = fs.statSync(fullPath);
+  return {
+    isoYear: winner.isoYear,
+    isoWeek: winner.isoWeek,
+    file: winner.name,
+    fullPath,
+    mtimeMs: stat.mtimeMs,
+    weekStart: weekStartFromIso(winner.isoYear, winner.isoWeek),
+  };
+}
+
+export function isStaleWeekly({
+  sessionDir = config.sessionDir,
+  currentRange,
+} = {}) {
+  const last = findLatestWeekly({ sessionDir });
+  if (!last) {
+    return {
+      stale: true,
+      last: null,
+      ageDays: null,
+      currentRange,
+      reason: "no-prior-weekly",
+    };
+  }
+  const sameWeek = last.isoYear === currentRange.isoYear && last.isoWeek === currentRange.isoWeek;
+  const diffMs = currentRange.weekStart.getTime() - last.weekStart.getTime();
+  const ageDays = Math.round(diffMs / 86400000);
+  return {
+    stale: !sameWeek,
+    last,
+    ageDays,
+    currentRange,
+    reason: sameWeek ? "fresh" : "stale",
+  };
+}
+
+export function describeWeeklyStatus({ sessionDir = config.sessionDir, currentRange } = {}) {
+  const status = isStaleWeekly({ sessionDir, currentRange });
+  const currentLabel = `${status.currentRange.isoYear}-W${pad2(status.currentRange.isoWeek)}`;
+  if (!status.last) {
+    return {
+      status,
+      line: `[scratch-digest] No weekly digest found yet. Current week: ${currentLabel}.`,
+    };
+  }
+  const lastLabel = `${status.last.isoYear}-W${pad2(status.last.isoWeek)}`;
+  const days = status.ageDays;
+  const dayWord = days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"} ago`;
+  if (status.stale) {
+    return {
+      status,
+      line: `[scratch-digest] Last weekly digest: ${lastLabel} (${dayWord}). Current week: ${currentLabel}.`,
+    };
+  }
+  return {
+    status,
+    line: `[scratch-digest] Weekly digest ${lastLabel} is up to date (${dayWord}).`,
+  };
+}
+
 function pad2(n) {
   return String(n).padStart(2, "0");
 }

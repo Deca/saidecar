@@ -71,6 +71,7 @@ export const config = {
   autoFilterEnabled: process.env.SCRATCH_AI_AUTO_FILTER === "true",
   showThinking: process.env.SCRATCH_AI_SHOW_THINKING === "true",
   weeklySummaryEnabled: process.env.SCRATCH_AI_WEEKLY_SUMMARY === "true",
+  weeklyAutoEnabled: process.env.SCRATCH_AI_WEEKLY_AUTO === "true",
 };
 
 import { PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_ANTHROPIC, PROVIDER_MINIMAX, KNOWN_PROVIDERS } from "./providers/index.js";
