@@ -13,6 +13,10 @@ function entryScore(entry) {
   if (entry.tags?.length) score += 3;
   if (entry.sources?.length) score += 2;
   if (entry.mode === "think" || entry.mode === "deepweb") score += 1;
+  if (entry.isDecision) score += 2;
+  if (entry.isCodeSnippet) score += 1;
+  if (entry.importance === "high") score += 3;
+  else if (entry.importance === "medium") score += 1;
   return score;
 }
 
@@ -65,7 +69,7 @@ export function renderDigestMarkdown({ entries, date = todayStamp(), project = c
   }
 
   lines.push("", "## Possible Decisions", "");
-  const decisionEntries = entries.filter((entry) => /decid|decision|choose|plan|should/i.test(`${entry.question}\n${entry.answer}`));
+  const decisionEntries = entries.filter((entry) => entry.isDecision || /decid|decision|choose|plan|should/i.test(`${entry.question}\n${entry.answer}`));
   if (decisionEntries.length) {
     for (const entry of decisionEntries.slice(0, 8)) {
       lines.push(`- ${short(entry.question, 180)}`);
@@ -99,7 +103,37 @@ export function renderDigestMarkdown({ entries, date = todayStamp(), project = c
     lines.push("- No obvious follow-ups found.");
   }
 
+  lines.push("", "## Topics", "");
+  const topicCounts = countBy(entries.filter((entry) => entry.topic), (entry) => entry.topic);
+  if (topicCounts.length) {
+    for (const [topic, count] of topicCounts.slice(0, 8)) {
+      lines.push(`- ${topic}: ${count}`);
+    }
+  } else {
+    lines.push("- No topic information extracted.");
+  }
+
+  lines.push("", "## High-Importance Entries", "");
+  const highImportance = entries.filter((entry) => entry.importance === "high");
+  if (highImportance.length) {
+    for (const entry of highImportance.slice(0, 8)) {
+      lines.push(`- ${short(entry.question, 180)}`);
+    }
+  } else {
+    lines.push("- No high-importance entries.");
+  }
+
   return `${lines.join("\n")}\n`;
+}
+
+function countBy(items, getKey) {
+  const counts = new Map();
+  for (const item of items) {
+    const key = getKey(item);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
 export function writeDigest(markdown, date = todayStamp(), sessionDir = config.sessionDir) {

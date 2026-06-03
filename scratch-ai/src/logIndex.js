@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import { parseJsonlLine } from "./logParser.js";
 import { parseJson } from "./parseUtils.js";
 import { annotationState, entryKey } from "./annotations.js";
+import { extractStructuredFields } from "./structuredExtract.js";
 
 export function openLogIndex(indexPath = config.indexPath) {
   fs.mkdirSync(path.dirname(indexPath), { recursive: true });
@@ -53,6 +54,41 @@ export function ensureSchema(db) {
       indexed_at TEXT NOT NULL
     );
   `);
+
+  applyMigrations(db);
+}
+
+const STRUCTURED_COLUMNS = [
+  { name: "is_decision", type: "INTEGER NOT NULL DEFAULT 0" },
+  { name: "is_code_snippet", type: "INTEGER NOT NULL DEFAULT 0" },
+  { name: "topic", type: "TEXT" },
+  { name: "language", type: "TEXT" },
+  { name: "importance", type: "TEXT" },
+];
+
+function applyMigrations(db) {
+  const existing = new Set(
+    db
+      .prepare("PRAGMA table_info(entries)")
+      .all()
+      .map((row) => row.name)
+  );
+
+  for (const column of STRUCTURED_COLUMNS) {
+    if (!existing.has(column.name)) {
+      db.exec(`ALTER TABLE entries ADD COLUMN ${column.name} ${column.type}`);
+    }
+  }
+
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_entries_topic ON entries(topic)"
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_entries_language ON entries(language)"
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_entries_importance ON entries(importance)"
+  );
 }
 
 export function refreshIndex({
@@ -127,9 +163,10 @@ function indexFileIfChanged(db, file, stats) {
   const insertEntry = db.prepare(`
     INSERT INTO entries (
       log_file, line_number, timestamp, project, backend, mode, model,
-      question, answer, duration_ms, usage_json, sources_json, raw_json
+      question, answer, duration_ms, usage_json, sources_json, raw_json,
+      is_decision, is_code_snippet, topic, language, importance
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertFts = db.prepare(`
     INSERT INTO entries_fts (entry_id, question, answer, sources)
@@ -152,6 +189,13 @@ function indexFileIfChanged(db, file, stats) {
       return;
     }
 
+    const structured = extractStructuredFields({
+      question: entry.question,
+      answer: entry.answer,
+      project: entry.project,
+      sources: entry.sources,
+    });
+
     lineCount += 1;
     const result = insertEntry.run(
       entry.logFile,
@@ -166,7 +210,12 @@ function indexFileIfChanged(db, file, stats) {
       entry.durationMs,
       entry.usageJson,
       entry.sourcesJson,
-      entry.rawJson
+      entry.rawJson,
+      structured.isDecision ? 1 : 0,
+      structured.isCodeSnippet ? 1 : 0,
+      structured.topic,
+      structured.language,
+      structured.importance
     );
     insertFts.run(
       result.lastInsertRowid,
@@ -198,6 +247,11 @@ export function searchEntries({
   date = "all",
   saved = false,
   tag = "all",
+  topic = "all",
+  language = "all",
+  importance = "all",
+  decisionOnly = false,
+  codeOnly = false,
   limit = 100,
   indexPath = config.indexPath,
   annotationDir = config.annotationDir,
@@ -229,6 +283,29 @@ export function searchEntries({
     if (project !== "all") {
       where.push("project = $project");
       params.$project = project;
+    }
+
+    if (topic !== "all") {
+      where.push("topic = $topic");
+      params.$topic = topic;
+    }
+
+    if (language !== "all") {
+      where.push("language = $language");
+      params.$language = language;
+    }
+
+    if (importance !== "all") {
+      where.push("importance = $importance");
+      params.$importance = importance;
+    }
+
+    if (decisionOnly) {
+      where.push("is_decision = 1");
+    }
+
+    if (codeOnly) {
+      where.push("is_code_snippet = 1");
     }
 
     const dateCutoff = dateToCutoff(date);
@@ -274,6 +351,9 @@ export function getFilterOptions({
       modes: distinctValues(db, "mode"),
       backends: distinctValues(db, "backend"),
       projects: distinctValues(db, "project"),
+      topics: distinctNullableValues(db, "topic"),
+      languages: distinctNullableValues(db, "language"),
+      importances: distinctNullableValues(db, "importance"),
       tags: [...new Set([...annotations.byEntry.values()].flatMap((item) => item.tags))].sort(),
     };
   } finally {
@@ -284,6 +364,13 @@ export function getFilterOptions({
 function distinctValues(db, column) {
   return db
     .prepare(`SELECT DISTINCT ${column} AS value FROM entries WHERE ${column} != '' ORDER BY ${column}`)
+    .all()
+    .map((row) => row.value);
+}
+
+function distinctNullableValues(db, column) {
+  return db
+    .prepare(`SELECT DISTINCT ${column} AS value FROM entries WHERE ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column}`)
     .all()
     .map((row) => row.value);
 }
@@ -316,6 +403,11 @@ function rowToEntry(row, annotations = new Map()) {
     usage: parseJson(row.usage_json),
     sources: parseJson(row.sources_json) || [],
     raw: parseJson(row.raw_json),
+    isDecision: Boolean(row.is_decision),
+    isCodeSnippet: Boolean(row.is_code_snippet),
+    topic: row.topic || null,
+    language: row.language || null,
+    importance: row.importance || null,
     favorite: annotation.favorite,
     tags: annotation.tags,
     notes: annotation.notes,

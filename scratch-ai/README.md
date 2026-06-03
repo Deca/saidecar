@@ -14,8 +14,9 @@ It is intentionally not a coding agent. In direct OpenAI mode it does not scan r
 - `/deepweb` reasoning + web-search mode
 - Local JSONL logging
 - Read-only log explorer with SQLite FTS search
+- Structured indexing (decision / code / language / topic / importance) per entry
 - Saved/favorited/tagged log annotations
-- On-demand Markdown review/digest generation
+- On-demand Markdown review/digest generation (with topic and high-importance sections)
 - Designed for narrow Zellij side panes
 - No repo mutation
 - No shell execution
@@ -448,12 +449,16 @@ b cycle backend
 p cycle project
 d cycle date
 g cycle tag
+i cycle importance (all → high → medium → low)
+n toggle code-only
 s toggle saved-only
 f favorite/save selected entry
 r reindex
 q quit from list/detail
 ctrl+c quit anywhere
 ```
+
+Each result row also shows a code indicator (`<>`) and an importance badge (`!!` for high, `!` for medium). The header line always reflects the current filter state, e.g. `mode=all backend=all project=all date=all saved=no tag=all importance=high code=yes`.
 
 ## Index Architecture
 
@@ -462,7 +467,7 @@ JSONL files are the canonical log. SQLite FTS5 is a **derived search index** - i
 | File | Purpose | Lifespan |
 |------|---------|----------|
 | `YYYY-MM-DD.jsonl` | Canonical log | Append-only, permanent |
-| `scratch-ai.sqlite` | Search index | Rebuildable cache |
+| `scratch-ai.sqlite` | Search index (FTS5 + structured fields: decision, code, language, topic, importance) | Rebuildable cache |
 | `annotations/*.jsonl` | Favorites/tags | Append-only |
 
 The index auto-refreshes when you run `scratch-logs` or `scratch-digest`. Press `r` in the log explorer to force a manual reindex.
@@ -501,6 +506,49 @@ With `--write`, Markdown is saved under:
 ```text
 ~/dev-brain/sessions/YYYY-MM-DD.md
 ```
+
+The digest surfaces structured fields extracted by the index:
+
+- `## Possible Decisions` is driven by the `isDecision` flag (with a regex safety-net)
+- `## Topics` lists each topic with its count (e.g. `iron-anchor: 7`)
+- `## High-Importance Entries` lists entries scored `importance=high`
+
+## Structured Indexing
+
+Every entry is enriched with five structured fields at index time, so you can filter and group precisely instead of relying only on free-text search.
+
+| Field | Type | Source |
+|-------|------|--------|
+| `isDecision` | boolean | Keyword/regex scan of question + answer |
+| `isCodeSnippet` | boolean | Fenced code blocks, multiple inline code spans, or code-like lines |
+| `language` | string | First code-fence language (normalized: `py→python`, `ts→typescript`, …) |
+| `topic` | string | `Topic:` prefix, first `#hashtag` in the question, or the project name |
+| `importance` | `low` / `medium` / `high` | Scored from decision + code + sources + length |
+
+These are **rule-based and deterministic** — no LLM calls, no extra cost, works on every entry including old ones. Fields are recomputed on every `refreshIndex()`, so you can simply delete `scratch-ai.sqlite*` to force a full backfill:
+
+```bash
+rm -f ~/dev-brain/scratch-ai.sqlite*
+node ./bin/scratch-logs.js
+```
+
+The SQLite schema is auto-migrated: new columns (`is_decision`, `is_code_snippet`, `topic`, `language`, `importance`) and indexes are added on first open.
+
+### Programmatic access
+
+```js
+import { searchEntries, getFilterOptions } from "./src/logIndex.js";
+
+const highImportance = searchEntries({ importance: "high", limit: 20 });
+const codeOnly = searchEntries({ codeOnly: true, language: "python" });
+const decisions = searchEntries({ decisionOnly: true, date: "7d" });
+
+const options = getFilterOptions();
+// { modes: [...], backends: [...], projects: [...],
+//   topics: [...], languages: [...], importances: [...], tags: [...] }
+```
+
+See `src/structuredExtract.js` for the extraction rules and `src/logIndex.js` for the filter SQL.
 
 ## Doctor
 
