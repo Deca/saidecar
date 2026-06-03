@@ -22,6 +22,15 @@ export async function askModel({ question, modeName, sessionContext = [] }) {
       const result = await askAnthropicProvider({ question, modeName, sessionContext });
       return { ...result, mode };
     }
+    if (config.provider === PROVIDER_MINIMAX && mode.tools.length > 0) {
+      // MiniMax doesn't have a usable web search API - route to OpenAI for web mode
+      if (config.apiKey || process.env.OPENAI_API_KEY) {
+        const result = await askOpenAIProvider({ question, modeName, sessionContext });
+        return { ...result, mode };
+      }
+      throw new Error("Web search requires OpenAI API key. Set OPENAI_API_KEY or use a provider with web search.");
+    }
+
     if (config.provider === PROVIDER_MINIMAX) {
       const result = await askMinimaxProvider({ question, modeName, sessionContext });
       return { ...result, mode };

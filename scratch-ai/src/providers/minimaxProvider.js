@@ -30,10 +30,14 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
   const payload = {
     model,
     system: systemPrompt,
-    messages: [{ role: "user", content: questionWithContext }],
+    messages: buildMessages(questionWithContext),
     max_tokens: 4096,
     ...(mode.tools?.length > 0 && { tools: transformToolsForMinimax(mode.tools) }),
   };
+
+  function buildMessages(questionWithContext) {
+    return [{ role: "user", content: questionWithContext }];
+  }
 
   function transformToolsForMinimax(tools) {
     return tools.map((tool) => {
@@ -57,57 +61,102 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
     });
   }
 
-  const headers = {
-    "Authorization": `Bearer ${credentials.access_token}`,
-    "Content-Type": "application/json",
-    "anthropic-version": "2023-06-01",
-  };
+  async function executeToolCall(toolCall, tools) {
+    const tool = tools.find((t) => t.name === toolCall.name);
+    if (!tool) {
+      return { tool_use_id: toolCall.id, content: `Error: unknown tool ${toolCall.name}` };
+    }
 
-  const response = await fetch(`${baseUrl}/messages`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  if (response.status === 401) {
-    // Token expired, try refresh
-    const refreshed = await auth.refreshCredentials();
-    if (refreshed) {
-      // Retry with new token
-      headers.Authorization = `Bearer ${refreshed.access_token}`;
-      const retryResponse = await fetch(`${baseUrl}/messages`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-
-      if (!retryResponse.ok) {
-        const errorText = await retryResponse.text();
-        throw new Error(`MiniMax API error: HTTP ${retryResponse.status} ${errorText}`);
+    if (toolCall.name === "web_search") {
+      const query = toolCall.input?.query;
+      if (!query) {
+        return { tool_use_id: toolCall.id, content: "Error: missing query parameter" };
       }
 
-      const data = await retryResponse.json();
-      return parseProviderResponse("minimax", data, "minimax");
+      // MiniMax web_search tool: try common search endpoints
+      const searchEndpoints = [
+        `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+      ];
+
+      // Try fetching through a simple proxy or direct search
+      // For now, return a placeholder that indicates search was triggered
+      // The model will use this to formulate an answer
+      return {
+        tool_use_id: toolCall.id,
+        content: JSON.stringify({
+          query,
+          results: [],
+          message: "Web search tool called - implement actual search API",
+        }),
+      };
     }
-    throw new Error("MiniMax authentication expired. Please re-authenticate with 'mmx auth login'");
+
+    return { tool_use_id: toolCall.id, content: `Error: unhandled tool ${toolCall.name}` };
   }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`MiniMax API error: HTTP ${response.status} ${errorText}`);
+  async function sendRequest(payload, tools) {
+    const response = await fetch(`${baseUrl}/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 401) {
+      const refreshed = await auth.refreshCredentials();
+      if (refreshed) {
+        headers.Authorization = `Bearer ${refreshed.access_token}`;
+        return sendRequest(payload, tools);
+      }
+      throw new Error("MiniMax authentication expired. Please re-authenticate with 'mmx auth login'");
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`MiniMax API error: HTTP ${response.status} ${errorText}`);
+    }
+
+    return response.json();
   }
 
-  const data = await response.json();
+  const tools = transformToolsForMinimax(mode.tools || []);
+  let messages = buildMessages(questionWithContext);
+  let data = await sendRequest(payload, tools);
 
   if (data.type === "error") {
     throw new Error(`MiniMax API error: ${data.error?.message || JSON.stringify(data)}`);
   }
 
-  const result = parseProviderResponse("minimax", data, "minimax");
+  // Tool use loop: if model returns tool_use blocks, execute and continue
+  for (let iteration = 0; iteration < 5; iteration++) {
+    const toolCalls = data.content?.filter((block) => block.type === "tool_use") || [];
 
-  if (!result.answer && mode.tools?.length > 0) {
-    console.log("[MiniMax debug] response content blocks:", JSON.stringify(data.content, null, 2));
+    if (toolCalls.length === 0) {
+      break;
+    }
+
+    // Add assistant message with tool calls to conversation history
+    messages.push({ role: "assistant", content: data.content });
+
+    // Execute each tool call and collect results
+    const toolResults = [];
+    for (const toolCall of toolCalls) {
+      const result = await executeToolCall(toolCall, tools);
+      toolResults.push(result);
+    }
+
+    // Add tool results to conversation
+    messages.push({
+      role: "user",
+      content: toolResults.map((result) => ({
+        type: "tool_result",
+        tool_use_id: result.tool_use_id,
+        content: result.content,
+      })),
+    });
+
+    // Continue conversation with tool results
+    data = await sendRequest({ model, system: systemPrompt, messages, max_tokens: 4096, tools }, tools);
   }
 
-  return result;
+  const result = parseProviderResponse("minimax", data, "minimax");
 }
