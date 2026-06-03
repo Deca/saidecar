@@ -57,7 +57,7 @@ function drainQueue() {
     });
 }
 
-export function appendLog(entry) {
+export function appendLog(entry, options = {}) {
   ensureDir(config.logDir);
   const logFile = getLogFilePath();
   const lineNumber = nextLineNumber(logFile);
@@ -75,7 +75,9 @@ export function appendLog(entry) {
     throw new Error(`Failed to append log: ${error.message}`);
   }
 
-  triggerAutoFilter(entry);
+  if (!options.skipAutoFilter) {
+    triggerAutoFilter(entry);
+  }
 
   return { logFile, lineNumber };
 }

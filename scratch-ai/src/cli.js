@@ -551,7 +551,7 @@ async function handleQuestion(parsed) {
         enabled: session.contextEnabled,
         exchanges: sessionContext.length,
       },
-    });
+    }, { skipAutoFilter: true });
     session.history[session.history.length - 1].logRef = logRef;
     filterDecision = await triggerAutoFilterAndWait({
       question: parsed.question,
