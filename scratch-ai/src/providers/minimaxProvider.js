@@ -99,5 +99,15 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
 
   const data = await response.json();
 
-  return parseProviderResponse("minimax", data, "minimax");
+  if (data.type === "error") {
+    throw new Error(`MiniMax API error: ${data.error?.message || JSON.stringify(data)}`);
+  }
+
+  const result = parseProviderResponse("minimax", data, "minimax");
+
+  if (!result.answer && mode.tools?.length > 0) {
+    console.log("[MiniMax debug] response content blocks:", JSON.stringify(data.content, null, 2));
+  }
+
+  return result;
 }
