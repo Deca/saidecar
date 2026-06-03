@@ -6,13 +6,10 @@ import { MinimaxAuth } from "./minimaxAuth.js";
 export async function askMinimaxProvider({ question, modeName, sessionContext = [] }) {
   const auth = new MinimaxAuth();
 
-  // Check if we have valid cached credentials first
   const credentials = await auth.getCredentials();
-
   if (!credentials) {
     console.log("\n📝 MiniMax OAuth login required...");
     console.log("   Use 'mmx auth login' in terminal to authenticate, or set MINIMAX_API_KEY in .env\n");
-
     throw new Error(
       "MiniMax authentication required. Run 'mmx auth login' in terminal, or set MINIMAX_API_KEY in .env"
     );
@@ -27,17 +24,11 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
   const baseUrl = auth.getBaseUrl(credentials);
   const model = mode.model || "MiniMax-M3";
 
-  const payload = {
-    model,
-    system: systemPrompt,
-    messages: buildMessages(questionWithContext),
-    max_tokens: 4096,
-    ...(mode.tools?.length > 0 && { tools: transformToolsForMinimax(mode.tools) }),
+  const headers = {
+    "Authorization": `Bearer ${credentials.access_token}`,
+    "Content-Type": "application/json",
+    "anthropic-version": "2023-06-01",
   };
-
-  function buildMessages(questionWithContext) {
-    return [{ role: "user", content: questionWithContext }];
-  }
 
   function transformToolsForMinimax(tools) {
     return tools.map((tool) => {
@@ -48,10 +39,7 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
           input_schema: {
             type: "object",
             properties: {
-              query: {
-                type: "string",
-                description: "The search query",
-              },
+              query: { type: "string", description: "The search query" },
             },
             required: ["query"],
           },
@@ -61,40 +49,7 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
     });
   }
 
-  async function executeToolCall(toolCall, tools) {
-    const tool = tools.find((t) => t.name === toolCall.name);
-    if (!tool) {
-      return { tool_use_id: toolCall.id, content: `Error: unknown tool ${toolCall.name}` };
-    }
-
-    if (toolCall.name === "web_search") {
-      const query = toolCall.input?.query;
-      if (!query) {
-        return { tool_use_id: toolCall.id, content: "Error: missing query parameter" };
-      }
-
-      // MiniMax web_search tool: try common search endpoints
-      const searchEndpoints = [
-        `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-      ];
-
-      // Try fetching through a simple proxy or direct search
-      // For now, return a placeholder that indicates search was triggered
-      // The model will use this to formulate an answer
-      return {
-        tool_use_id: toolCall.id,
-        content: JSON.stringify({
-          query,
-          results: [],
-          message: "Web search tool called - implement actual search API",
-        }),
-      };
-    }
-
-    return { tool_use_id: toolCall.id, content: `Error: unhandled tool ${toolCall.name}` };
-  }
-
-  async function sendRequest(payload, tools) {
+  async function sendRequest(payload) {
     const response = await fetch(`${baseUrl}/messages`, {
       method: "POST",
       headers,
@@ -105,7 +60,7 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
       const refreshed = await auth.refreshCredentials();
       if (refreshed) {
         headers.Authorization = `Bearer ${refreshed.access_token}`;
-        return sendRequest(payload, tools);
+        return sendRequest(payload);
       }
       throw new Error("MiniMax authentication expired. Please re-authenticate with 'mmx auth login'");
     }
@@ -118,45 +73,50 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
     return response.json();
   }
 
-  const tools = transformToolsForMinimax(mode.tools || []);
-  let messages = buildMessages(questionWithContext);
-  let data = await sendRequest(payload, tools);
+  const tools = mode.tools?.length > 0 ? transformToolsForMinimax(mode.tools) : [];
+
+  const payload = {
+    model,
+    system: systemPrompt,
+    messages: [{ role: "user", content: questionWithContext }],
+    max_tokens: 4096,
+    ...(tools.length > 0 && { tools }),
+  };
+
+  let data = await sendRequest(payload);
 
   if (data.type === "error") {
     throw new Error(`MiniMax API error: ${data.error?.message || JSON.stringify(data)}`);
   }
 
-  // Tool use loop: if model returns tool_use blocks, execute and continue
-  for (let iteration = 0; iteration < 5; iteration++) {
-    const toolCalls = data.content?.filter((block) => block.type === "tool_use") || [];
+  // Handle tool calls if present (for non-web modes, tools is empty so this is skipped)
+  const toolCalls = data.content?.filter((block) => block.type === "tool_use") || [];
 
-    if (toolCalls.length === 0) {
-      break;
-    }
+  if (toolCalls.length > 0 && tools.length > 0) {
+    // Add assistant message with tool calls
+    const messages = [
+      { role: "user", content: questionWithContext },
+      { role: "assistant", content: data.content },
+    ];
 
-    // Add assistant message with tool calls to conversation history
-    messages.push({ role: "assistant", content: data.content });
+    // Execute tool calls and add results
+    const toolResults = toolCalls.map((toolCall) => ({
+      type: "tool_result",
+      tool_use_id: toolCall.id,
+      content: `[Tool ${toolCall.name} called with ${JSON.stringify(toolCall.input)} - implement actual execution]`,
+    }));
 
-    // Execute each tool call and collect results
-    const toolResults = [];
-    for (const toolCall of toolCalls) {
-      const result = await executeToolCall(toolCall, tools);
-      toolResults.push(result);
-    }
+    messages.push({ role: "user", content: toolResults });
 
-    // Add tool results to conversation
-    messages.push({
-      role: "user",
-      content: toolResults.map((result) => ({
-        type: "tool_result",
-        tool_use_id: result.tool_use_id,
-        content: result.content,
-      })),
+    // Continue with tool results
+    data = await sendRequest({
+      model,
+      system: systemPrompt,
+      messages,
+      max_tokens: 4096,
+      tools,
     });
-
-    // Continue conversation with tool results
-    data = await sendRequest({ model, system: systemPrompt, messages, max_tokens: 4096, tools }, tools);
   }
 
-  const result = parseProviderResponse("minimax", data, "minimax");
+  return parseProviderResponse("minimax", data, "minimax");
 }
