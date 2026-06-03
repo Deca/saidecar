@@ -71,6 +71,28 @@ export async function runDoctorChecks() {
     );
   }
 
+  // Check SearXNG instance for web search
+  const searxngUrl = (process.env.SEARXNG_URL || "http://localhost:8080").replace(/\/+$/, "");
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const response = await fetch(`${searxngUrl}/healthz`, {
+      signal: controller.signal,
+    }).catch(() => null);
+    clearTimeout(timeout);
+    checks.push(
+      check(
+        "SearXNG (web search)",
+        !!(response && response.ok),
+        response && response.ok
+          ? searxngUrl
+          : `${searxngUrl} unreachable; run SearXNG or set SEARXNG_URL`
+      )
+    );
+  } catch (error) {
+    checks.push(check("SearXNG (web search)", false, error.message));
+  }
+
   return checks;
 }
 

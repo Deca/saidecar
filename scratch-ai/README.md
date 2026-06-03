@@ -180,7 +180,35 @@ SCRATCH_AI_TIMEZONE=Europe/Rome
 
 # Auto-Filter (optional)
 SCRATCH_AI_AUTO_FILTER=true      # Enable LLM-based entry scoring
+
+# Web Search (SearXNG, self-hosted)
+SEARXNG_URL=http://localhost:8080   # Default SearXNG instance URL
+SEARXNG_ENGINES=bing,mojeek,presearch,wikipedia  # Engines to use (comma-separated)
 ```
+
+### Web Search Setup (SearXNG)
+
+The `/web` and `/deepweb` modes use [SearXNG](https://github.com/searxng/searxng) for web search. You need to run your own SearXNG instance:
+
+```bash
+# Run SearXNG with Docker (recommended)
+docker run -d --name searxng -p 8080:8080 \
+  -e SEARXNG_SECRET=$(openssl rand -hex 16) \
+  -e SEARXNG_LIMITER=false \
+  searxng/searxng
+
+# Or with docker-compose - see https://docs.searxng.org/admin/installation-docker.html
+```
+
+Then set in `.env`:
+```env
+SEARXNG_URL=http://localhost:8080
+SEARXNG_ENGINES=bing,mojeek,presearch,wikipedia
+```
+
+The default engines (google, duckduckgo, brave) are commonly rate-limited. We pin to engines that actually respond. You can customize via `SEARXNG_ENGINES`.
+
+Run `scratch-doctor` to verify SearXNG is reachable.
 
 ### Provider Setup
 

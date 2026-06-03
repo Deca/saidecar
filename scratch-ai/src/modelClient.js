@@ -13,57 +13,46 @@ import { modes } from "./modes.js";
 export async function askModel({ question, modeName, sessionContext = [] }) {
   const mode = modes[modeName] || modes.normal;
 
-  // Route by provider (non-OpenAI/non-Codex providers take precedence)
-  if (config.provider !== PROVIDER_OPENAI && config.provider !== PROVIDER_CODEX && config.provider) {
-    if (config.provider === PROVIDER_DEEPSEEK) {
-      const result = await askDeepSeekProvider({ question, modeName, sessionContext });
-      return { ...result, mode };
-    }
-    if (config.provider === PROVIDER_ANTHROPIC) {
-      const result = await askAnthropicProvider({ question, modeName, sessionContext });
-      return { ...result, mode };
-    }
-    if (config.provider === PROVIDER_MINIMAX && mode.tools.length > 0) {
-      // MiniMax doesn't have a usable client-side web search API.
-      // If OpenAI key is available, route to OpenAI provider. Otherwise use SearXNG.
-      if (config.apiKey || process.env.OPENAI_API_KEY) {
-        const result = await askOpenAIProvider({ question, modeName, sessionContext });
-        return { ...result, mode };
-      }
-      // Use SearXNG-based web search
-      const result = await askWebSearch({ question, modeName, sessionContext });
-      return { ...result, mode };
-    }
-
-    if (config.provider === PROVIDER_MINIMAX) {
-      const result = await askMinimaxProvider({ question, modeName, sessionContext });
-      return { ...result, mode };
-    }
-
-    // Web search mode: use SearXNG-based web search
-    if (mode.tools.length > 0 && config.backend !== "codex") {
-      const result = await askWebSearch({ question, modeName, sessionContext });
-      return { ...result, mode };
-    }
-  }
-
-  // OpenAI-compatible providers
-  if (config.provider === PROVIDER_OPENAI || config.provider === PROVIDER_DEEPSEEK) {
-    const result = await askOpenAIProvider({ question, modeName, sessionContext });
+  // Web search mode (uses SearXNG, falls back to DuckDuckGo)
+  if (mode.tools.length > 0 && config.backend !== "codex") {
+    const result = await askWebSearch({ question, modeName, sessionContext });
     return { ...result, mode };
   }
 
-  // Codex backend (only when provider is not set to a specific LLM provider)
+  // Codex backend with web search tools
   if (config.backend === "codex" && mode.tools.length > 0) {
     const result = await askCodexWebSearch({ question, modeName, sessionContext });
     return { ...result, mode };
   }
 
+  // Route by provider
+  if (config.provider === PROVIDER_MINIMAX) {
+    const result = await askMinimaxProvider({ question, modeName, sessionContext });
+    return { ...result, mode };
+  }
+
+  if (config.provider === PROVIDER_DEEPSEEK) {
+    const result = await askDeepSeekProvider({ question, modeName, sessionContext });
+    return { ...result, mode };
+  }
+
+  if (config.provider === PROVIDER_ANTHROPIC) {
+    const result = await askAnthropicProvider({ question, modeName, sessionContext });
+    return { ...result, mode };
+  }
+
+  if (config.provider === PROVIDER_OPENAI) {
+    const result = await askOpenAIProvider({ question, modeName, sessionContext });
+    return { ...result, mode };
+  }
+
+  // Codex backend without tools
   if (config.backend === "codex") {
     const result = await askCodex({ question, modeName, sessionContext });
     return { ...result, mode };
   }
 
+  // Default: OpenAI
   const result = await askOpenAI({ question, modeName, sessionContext });
   return { ...result, mode };
 }
