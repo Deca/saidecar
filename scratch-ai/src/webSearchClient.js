@@ -15,12 +15,22 @@ class WebSearchError extends Error {
 }
 
 // SearXNG search instance URL - can be configured via env or uses public instances
-function getSearchUrl() {
-  return process.env.SEARXNG_URL || "https://searx.space/search";
+function getSearchUrls() {
+  const configured = process.env.SEARXNG_URL;
+  if (configured) {
+    return [configured];
+  }
+  // Try multiple public instances - first one that works wins
+  return [
+    "https://searxng.privacydev.net/search",
+    "https://search.fossho.st/search",
+    "https://search.projectsegfau.lt/search",
+    "https://searx.organics.org/search",
+  ];
 }
 
 async function searxngSearch(query, count = 10) {
-  const searchUrl = getSearchUrl();
+  const searchUrls = getSearchUrls();
   const params = new URLSearchParams({
     q: query,
     format: "json",
@@ -28,30 +38,38 @@ async function searxngSearch(query, count = 10) {
     per_page: count,
   });
 
-  const response = await fetch(`${searchUrl}?${params.toString()}`, {
-    headers: {
-      "Accept": "application/json",
-    },
-  });
+  let lastError;
+  for (const searchUrl of searchUrls) {
+    try {
+      const response = await fetch(`${searchUrl}?${params.toString()}`, {
+        headers: {
+          "Accept": "application/json",
+        },
+      });
 
-  if (!response.ok) {
-    throw new WebSearchError(`SearXNG search failed: HTTP ${response.status}`, response.status);
+      if (response.ok) {
+        const data = await response.json();
+
+        if (!data.results || data.results.length === 0) {
+          return { status: SEARCH_NO_RESULTS, results: [], answer: "No search results found." };
+        }
+
+        const results = data.results.slice(0, count).map((r) => ({
+          title: r.title || "Untitled",
+          url: r.url || "",
+          snippet: r.content || r.snippet || "",
+          engine: r.engine || "unknown",
+        }));
+
+        return { status: SEARCH_SUCCESS, results, answer: null };
+      }
+      lastError = `HTTP ${response.status}`;
+    } catch (err) {
+      lastError = err.message;
+    }
   }
 
-  const data = await response.json();
-
-  if (!data.results || data.results.length === 0) {
-    return { status: SEARCH_NO_RESULTS, results: [], answer: "No search results found." };
-  }
-
-  const results = data.results.slice(0, count).map((r) => ({
-    title: r.title || "Untitled",
-    url: r.url || "",
-    snippet: r.content || r.snippet || "",
-    engine: r.engine || "unknown",
-  }));
-
-  return { status: SEARCH_SUCCESS, results, answer: null };
+  throw new WebSearchError(`All SearXNG instances failed. Last error: ${lastError}`, 404);
 }
 
 function formatSearchResults(query, results) {
