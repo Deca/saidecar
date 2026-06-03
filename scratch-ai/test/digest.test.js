@@ -34,7 +34,7 @@ const entries = [
 test("renderDigestMarkdown creates expected review sections", () => {
   const markdown = renderDigestMarkdown({ entries, date: "2026-06-01", project: "demo" });
 
-  assert.match(markdown, /# Scratch AI Review - 2026-06-01/);
+  assert.match(markdown, /# sAIdecar Review - 2026-06-01/);
   assert.match(markdown, /## Useful Answers/);
   assert.match(markdown, /Should we keep JSONL canonical/);
   assert.match(markdown, /## Possible Decisions/);
@@ -200,7 +200,7 @@ test("weeklyFileName pads ISO week number", () => {
 });
 
 test("searchEntries honors since/until range across the weekly window", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-weekly-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "saidecar-weekly-"));
   const logDir = path.join(root, "inbox");
   const indexPath = path.join(root, "scratch-ai.sqlite");
   fs.mkdirSync(logDir, { recursive: true });

@@ -9,11 +9,11 @@ import { formatEntriesMarkdown, formatEntriesText } from "../src/logExport.js";
 
 function printHelp() {
   console.log(`Usage:
-  scratch-logs
-  scratch-logs --query <text>
-  scratch-logs --query <text> --format markdown
-  scratch-logs --date today|7d|30d|all --format markdown
-  scratch-logs --help
+  saidecar-logs
+  saidecar-logs --query <text>
+  saidecar-logs --query <text> --format markdown
+  saidecar-logs --date today|7d|30d|all --format markdown
+  saidecar-logs --help
 
 Options:
   --query <text>   Run a non-interactive search and print matching entries.
@@ -25,8 +25,8 @@ Options:
   --reindex        Refresh the index before returning.
 
 Environment:
-  SCRATCH_AI_LOG_DIR=${config.logDir}
-  SCRATCH_AI_INDEX_PATH=${config.indexPath}`);
+  SAIDECAR_LOG_DIR=${config.logDir}
+  SAIDECAR_INDEX_PATH=${config.indexPath}`);
 }
 
 function argValue(name) {

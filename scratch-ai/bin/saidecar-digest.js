@@ -18,16 +18,16 @@ import {
 
 function printHelp() {
   console.log(`Usage:
-  scratch-digest
-  scratch-digest --date YYYY-MM-DD
-  scratch-digest --saved-only
-  scratch-digest --write
-  scratch-digest --dry-run
-  scratch-digest --weekly [--week-of YYYY-MM-DD] [--weeks-ago N] [--summary]
+  saidecar-digest
+  saidecar-digest --date YYYY-MM-DD
+  saidecar-digest --saved-only
+  saidecar-digest --write
+  saidecar-digest --dry-run
+  saidecar-digest --weekly [--week-of YYYY-MM-DD] [--weeks-ago N] [--summary]
 
 Options:
   --date <date>        Digest a specific date. Default: today.
-  --project <name>     Filter by project. Default: current SCRATCH_AI_PROJECT.
+  --project <name>     Filter by project. Default: current SAIDECAR_PROJECT.
   --saved-only         Digest only saved/favorited entries.
   --write              Save to ${config.sessionDir}/YYYY-MM-DD.md instead of printing only.
   --dry-run            Print selected entry refs without rendering a digest.
@@ -35,7 +35,7 @@ Options:
   --week-of <date>     Reference date inside the target week. Default: today.
   --weeks-ago <n>      Pick the week n weeks before the reference (default 0).
   --summary            Ask the active LLM provider for a 3-5 bullet narrative
-                       (requires SCRATCH_AI_WEEKLY_SUMMARY=true or is auto-enabled
+                       (requires SAIDECAR_WEEKLY_SUMMARY=true or is auto-enabled
                         for this run if you pass --summary explicitly).
   --yes                Auto-accept the weekly-auto prompt (writes the digest).
   --no-weekly-check    Skip the weekly-auto startup check for this run.`);
@@ -108,7 +108,7 @@ async function runWeeklyCheck() {
 
   if (!isInteractive && !forceYes) {
     console.log(
-      `[scratch-digest] Weekly digest for ${currentLabel} is pending. Re-run interactively or pass --yes to generate.`
+      `[saidecar-digest] Weekly digest for ${currentLabel} is pending. Re-run interactively or pass --yes to generate.`
     );
     return;
   }
@@ -116,7 +116,7 @@ async function runWeeklyCheck() {
   const lastLabel = status.last
     ? `${status.last.isoYear}-W${pad2(status.last.isoWeek)} (${status.ageDays} day${status.ageDays === 1 ? "" : "s"} ago)`
     : "none yet";
-  const question = `[scratch-digest] Last weekly digest: ${lastLabel}. Generate ${currentLabel} now? [Y/n] `;
+  const question = `[saidecar-digest] Last weekly digest: ${lastLabel}. Generate ${currentLabel} now? [Y/n] `;
 
   let accepted = false;
   if (forceYes) {
@@ -136,7 +136,7 @@ async function runWeeklyCheck() {
   }
 
   if (!accepted) {
-    console.log("[scratch-digest] Skipped weekly digest generation.");
+    console.log("[saidecar-digest] Skipped weekly digest generation.");
     return;
   }
 
@@ -185,7 +185,7 @@ async function runWeeklyCheck() {
     isoYear: currentRange.isoYear,
     isoWeek: currentRange.isoWeek,
   });
-  console.log(`[scratch-digest] Wrote ${file}`);
+  console.log(`[saidecar-digest] Wrote ${file}`);
 }
 
 await runWeeklyCheck();
@@ -228,7 +228,7 @@ if (isWeekly) {
       config.weeklySummaryEnabled = previousEnabled;
     }
     if (!llmSummary) {
-      console.error("[scratch-digest] Weekly summary requested but LLM did not return a result; printing digest without summary.");
+      console.error("[saidecar-digest] Weekly summary requested but LLM did not return a result; printing digest without summary.");
     }
   }
 

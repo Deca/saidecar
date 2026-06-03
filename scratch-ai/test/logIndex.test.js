@@ -8,7 +8,7 @@ import { appendAnnotation } from "../src/annotations.js";
 import { getFilterOptions, openLogIndex, refreshIndex, searchEntries } from "../src/logIndex.js";
 
 function makeTempPaths() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-logs-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "saidecar-logs-"));
   return {
     root,
     logDir: path.join(root, "inbox"),

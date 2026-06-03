@@ -14,7 +14,7 @@ export function openLogIndex(indexPath = config.indexPath) {
     db = new DatabaseSync(indexPath);
   } catch (error) {
     throw new Error(
-      `Failed to open index ${indexPath}. If the file is corrupt, delete it and re-runscratch-digest or scratch-log. Cause: ${error.message}`
+      `Failed to open index ${indexPath}. If the file is corrupt, delete it and re-run saidecar-digest or saidecar-logs. Cause: ${error.message}`
     );
   }
   db.exec("PRAGMA journal_mode = WAL");

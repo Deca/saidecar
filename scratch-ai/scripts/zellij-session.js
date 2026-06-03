@@ -11,16 +11,16 @@ const projectRoot = path.resolve(
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`Usage:
-  scratch-zellij
-  scratch-zellij <session-name> <layout-file>
+  saidecar-zellij
+  saidecar-zellij <session-name> <layout-file>
 
 Examples:
-  scratch-zellij
-  scratch-zellij dev dev-with-scratch.kdl`);
+  saidecar-zellij
+  saidecar-zellij dev dev-with-saidecar.kdl`);
   process.exit(0);
 }
 
-const sessionName = process.argv[2] || "scratch-ai";
+const sessionName = process.argv[2] || "saidecar";
 const layoutName = process.argv[3] || `${sessionName}.kdl`;
 const layoutPath = path.join(projectRoot, "layouts", layoutName);
 const zellijCommand = process.platform === "win32" ? "zellij.exe" : "zellij";

@@ -22,17 +22,17 @@ if (!process.env.ZELLIJ || !sessionName) {
 const args = [
   "run",
   "--name",
-  "scratch-ai",
+  "saidecar",
   "--direction",
   "right",
   "--width",
   "35%",
   "--",
   process.execPath,
-  path.join(projectRoot, "bin", "scratch-ai.js"),
+  path.join(projectRoot, "bin", "saidecar.js"),
 ];
 
-if (process.env.SCRATCH_AI_ZELLIJ_DEBUG) {
+if (process.env.SAIDECAR_ZELLIJ_DEBUG) {
   console.error(`session: ${sessionName}`);
   console.error(`cwd: ${projectRoot}`);
   console.error(`command: ${zellijCommand} ${args.join(" ")}`);

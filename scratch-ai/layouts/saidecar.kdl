@@ -9,17 +9,17 @@ layout {
         }
     }
 
-    tab name="scratch-ai" {
+    tab name="saidecar" {
         pane split_direction="vertical" {
             pane {
                 cwd "."
                 command "C:\\Program Files\\nodejs\\node.exe"
-                args "bin\\scratch-ai.js"
+                args "bin\\saidecar.js"
             }
             pane size="42%" {
                 cwd "."
                 command "C:\\Program Files\\nodejs\\node.exe"
-                args "bin\\scratch-logs.js"
+                args "bin\\saidecar-logs.js"
             }
         }
     }
