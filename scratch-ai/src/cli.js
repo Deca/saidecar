@@ -3,7 +3,7 @@ import { stdin as input, stdout as output } from "node:process";
 import crypto from "node:crypto";
 import chalk from "chalk";
 import { askModel } from "./modelClient.js";
-import { config, validateConfig } from "./config.js";
+import { config, validateConfig, APP_DISPLAY_NAME } from "./config.js";
 import { wrapText } from "./textUtils.js";
 import { appendLog, getLogFilePath, triggerAutoFilterAndWait } from "./logger.js";
 import { modes, parseInput } from "./modes.js";
@@ -125,6 +125,7 @@ function startThinkingAnimation(modeName) {
     "[o_O] thinking..",
     "[o_o] thinking...",
   ];
+  const frameWidth = Math.max(...frames.map((frame) => frame.length));
   let index = 0;
 
   if (!process.stdout.isTTY) {
@@ -133,9 +134,11 @@ function startThinkingAnimation(modeName) {
   }
 
   const color = modeColor(modeName);
+  const trailing = "  Ctrl+C to stop";
+  const lineWidth = frameWidth + trailing.length;
   const render = () => {
-    const frame = frames[index % frames.length];
-    process.stdout.write(`\r${color(frame)}${ui.dim("  Ctrl+C to stop")}`);
+    const frame = frames[index % frames.length].padEnd(frameWidth);
+    process.stdout.write(`\r${color(frame)}${ui.dim(trailing)}`);
     index += 1;
   };
 
@@ -144,7 +147,7 @@ function startThinkingAnimation(modeName) {
 
   return () => {
     clearInterval(timer);
-    process.stdout.write(`\r${" ".repeat(Math.min(process.stdout.columns || 72, 88))}\r`);
+    process.stdout.write(`\r${" ".repeat(lineWidth)}\r`);
   };
 }
 
@@ -165,7 +168,7 @@ function printRequestHeader(parsed) {
 
 function printAnswerHeader(result) {
   const color = modeColor(result.mode.label);
-  console.log(`${ui.accent.bold("Scratch AI")} ${color(`[${result.mode.label}]`)}`);
+  console.log(`${ui.accent.bold(APP_DISPLAY_NAME)} ${color(`[${result.mode.label}]`)}`);
   console.log(ui.dim(`backend=${result.backend || config.backend}`));
 }
 
@@ -215,7 +218,7 @@ function printFooter(durationMs, usage, filterDecision, timing) {
 
 function printHelp() {
   console.log(`
-${sectionTitle("Scratch AI commands")}
+${sectionTitle(`${APP_DISPLAY_NAME} commands`)}
 
 ${chalk.bold("Ask normally")}
   why does Laravel queue:work ignore .env changes?
@@ -328,7 +331,7 @@ function printStatus() {
   );
 
   console.log("");
-  console.log(sectionTitle("Scratch AI status"));
+  console.log(sectionTitle(`${APP_DISPLAY_NAME} status`));
   keyValue("session", session.id, chalk.yellow);
   keyValue("uptime", formatDuration(uptimeMs), chalk.white);
   keyValue("backend", config.backend, chalk.yellow);
@@ -368,7 +371,7 @@ function printStatus() {
 
 function printConfig() {
   console.log("");
-  console.log(sectionTitle("Scratch AI config"));
+  console.log(sectionTitle(`${APP_DISPLAY_NAME} config`));
   keyValue("backend", config.backend, chalk.yellow);
   keyValue("provider", config.provider, chalk.yellow);
   keyValue("model", session.currentModel, chalk.green);
@@ -410,7 +413,7 @@ function printContextStatus() {
   );
 
   console.log("");
-  console.log(sectionTitle("Scratch AI context"));
+  console.log(sectionTitle(`${APP_DISPLAY_NAME} context`));
   keyValue("status", session.contextEnabled ? "on" : "off", session.contextEnabled ? chalk.yellow : chalk.white);
   keyValue(
     "policy",

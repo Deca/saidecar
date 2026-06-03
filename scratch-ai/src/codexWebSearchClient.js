@@ -65,10 +65,10 @@ function headers(token, accountId, accept) {
   const result = {
     Authorization: `Bearer ${token}`,
     "chatgpt-account-id": accountId,
-    originator: "scratch-ai",
+    originator: "saidecar",
     "OpenAI-Beta": "responses=experimental",
     accept,
-    "User-Agent": "scratch-ai-codex-search",
+    "User-Agent": "saidecar-codex-search",
   };
 
   if (accept === "text/event-stream") {

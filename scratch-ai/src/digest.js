@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { config } from "./config.js";
+import { config, APP_DISPLAY_NAME } from "./config.js";
 import { searchEntries } from "./logIndex.js";
 import { askModel } from "./modelClient.js";
 
@@ -50,7 +50,7 @@ export function selectDigestEntries({
 
 export function renderDigestMarkdown({ entries, date = todayStamp(), project = config.project }) {
   const lines = [
-    `# Scratch AI Review - ${date}`,
+    `# ${APP_DISPLAY_NAME} Review - ${date}`,
     "",
     `Project: ${project}`,
     `Entries reviewed: ${entries.length}`,
@@ -60,7 +60,7 @@ export function renderDigestMarkdown({ entries, date = todayStamp(), project = c
   ];
 
   if (!entries.length) {
-    lines.push("- No matching Scratch AI entries found.");
+    lines.push(`- No matching ${APP_DISPLAY_NAME} entries found.`);
   } else {
     for (const entry of entries) {
       const tags = entry.tags?.length ? ` (${entry.tags.join(", ")})` : "";
@@ -220,7 +220,7 @@ export function describeWeeklyStatus({ sessionDir = config.sessionDir, currentRa
   if (!status.last) {
     return {
       status,
-      line: `[scratch-digest] No weekly digest found yet. Current week: ${currentLabel}.`,
+      line: `[saidecar-digest] No weekly digest found yet. Current week: ${currentLabel}.`,
     };
   }
   const lastLabel = `${status.last.isoYear}-W${pad2(status.last.isoWeek)}`;
@@ -229,12 +229,12 @@ export function describeWeeklyStatus({ sessionDir = config.sessionDir, currentRa
   if (status.stale) {
     return {
       status,
-      line: `[scratch-digest] Last weekly digest: ${lastLabel} (${dayWord}). Current week: ${currentLabel}.`,
+      line: `[saidecar-digest] Last weekly digest: ${lastLabel} (${dayWord}). Current week: ${currentLabel}.`,
     };
   }
   return {
     status,
-    line: `[scratch-digest] Weekly digest ${lastLabel} is up to date (${dayWord}).`,
+    line: `[saidecar-digest] Weekly digest ${lastLabel} is up to date (${dayWord}).`,
   };
 }
 

@@ -1,3 +1,5 @@
+import { APP_DISPLAY_NAME } from "./config.js";
+
 function truncate(text, maxLength = 260) {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
@@ -19,7 +21,7 @@ export function formatEntriesText(entries) {
 
 export function formatEntriesMarkdown(entries) {
   const lines = [
-    "# Scratch AI Log Export",
+    `# ${APP_DISPLAY_NAME} Log Export`,
     "",
     `${entries.length} result${entries.length === 1 ? "" : "s"}`,
     "",

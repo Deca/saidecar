@@ -1,3 +1,5 @@
+import { APP_DISPLAY_NAME } from "./config.js";
+
 export const DEFAULT_CONTEXT_EXCHANGES = 4;
 export const DEFAULT_CONTEXT_CHARS = 8000;
 
@@ -54,7 +56,7 @@ export function formatSessionContext(entries) {
     .map(
       (entry) => `Turn ${entry.index || "?"} [${entry.mode || "normal"}]
 User: ${entry.question}
-Scratch AI: ${entry.answer}`
+${APP_DISPLAY_NAME}: ${entry.answer}`
     )
     .join("\n\n");
 }
@@ -66,7 +68,7 @@ export function buildQuestionWithContext(question, entries) {
     return question;
   }
 
-  return `Use the following recent Scratch AI session context only when it helps answer the current question. If the current question is unrelated, ignore this context.
+  return `Use the following recent ${APP_DISPLAY_NAME} session context only when it helps answer the current question. If the current question is unrelated, ignore this context.
 
 Recent session context:
 ${context}

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { config, validateConfig } from "./config.js";
+import { config, validateConfig, APP_DISPLAY_NAME } from "./config.js";
 
 function check(name, ok, detail) {
   return { name, ok, detail };
@@ -9,7 +9,7 @@ function check(name, ok, detail) {
 
 function canWriteDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
-  const probe = path.join(dirPath, `.scratch-ai-doctor-${Date.now()}.tmp`);
+  const probe = path.join(dirPath, `.saidecar-doctor-${Date.now()}.tmp`);
   fs.writeFileSync(probe, "ok", "utf8");
   fs.unlinkSync(probe);
 }
@@ -97,7 +97,7 @@ export async function runDoctorChecks() {
 }
 
 export function formatDoctorChecks(checks) {
-  const lines = ["Scratch AI doctor", ""];
+  const lines = [`${APP_DISPLAY_NAME} doctor`, ""];
 
   for (const item of checks) {
     lines.push(`${item.ok ? "OK  " : "FAIL"} ${item.name} - ${item.detail}`);

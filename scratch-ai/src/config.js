@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import fs from "node:fs";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -20,70 +21,111 @@ export function expandHome(inputPath) {
   return inputPath;
 }
 
-function defaultIndexPath(logDir) {
-  return path.join(path.dirname(logDir), "scratch-ai.sqlite");
+export const APP_BRAND = "saidecar";
+export const APP_DISPLAY_NAME = "sAIdecar";
+export const APP_HOME = path.join(os.homedir(), `.${APP_BRAND}`);
+export const LEGACY_LOG_DIR = path.join(os.homedir(), "dev-brain", "inbox");
+export const DEFAULT_LOG_DIR = path.join(APP_HOME, "logs");
+
+function pathExists(candidate) {
+  try {
+    return fs.existsSync(candidate);
+  } catch {
+    return false;
+  }
 }
 
-function defaultBrainPath(logDir, childDir) {
+export function resolveDefaultLogDir(existsSync = pathExists) {
+  if (existsSync(LEGACY_LOG_DIR)) {
+    return LEGACY_LOG_DIR;
+  }
+  return DEFAULT_LOG_DIR;
+}
+
+function defaultIndexPath(logDir) {
+  if (logDir === LEGACY_LOG_DIR) {
+    return path.join(path.dirname(LEGACY_LOG_DIR), "scratch-ai.sqlite");
+  }
+  return path.join(path.dirname(logDir), `${APP_BRAND}.sqlite`);
+}
+
+function defaultSiblingPath(logDir, childDir) {
   return path.join(path.dirname(logDir), childDir);
 }
 
+function pickEnv(...names) {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value !== undefined && value !== "") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+const defaultLogDir = expandHome(resolveDefaultLogDir());
+
 export const config = {
   apiKey: process.env.OPENAI_API_KEY,
-  provider: (process.env.SCRATCH_AI_PROVIDER || "openai").toLowerCase(),
+  provider: (pickEnv("SAIDECAR_PROVIDER", "SCRATCH_AI_PROVIDER") || "openai").toLowerCase(),
   providerApiKey: process.env.PROVIDER_API_KEY,
   providerBaseUrl: process.env.PROVIDER_BASE_URL,
   minimaxApiKey: process.env.MINIMAX_API_KEY,
   minimaxBaseUrl: process.env.MINIMAX_BASE_URL,
   minimaxAuthMode: process.env.MINIMAX_AUTH_MODE,
-  backend: (process.env.SCRATCH_AI_BACKEND || "openai").toLowerCase(),
-  activeModel: process.env.SCRATCH_AI_MODEL || "gpt-4o-mini",
+  backend: (pickEnv("SAIDECAR_BACKEND", "SCRATCH_AI_BACKEND") || "openai").toLowerCase(),
+  activeModel: pickEnv("SAIDECAR_MODEL", "SCRATCH_AI_MODEL") || "gpt-4o-mini",
   thinkModel:
-    process.env.SCRATCH_AI_THINK_MODEL ||
-    process.env.SCRATCH_AI_MODEL ||
+    pickEnv("SAIDECAR_THINK_MODEL", "SCRATCH_AI_THINK_MODEL") ||
+    pickEnv("SAIDECAR_MODEL", "SCRATCH_AI_MODEL") ||
     "gpt-4o-mini",
-  codexCommand: process.env.SCRATCH_AI_CODEX_COMMAND || "codex",
+  codexCommand: pickEnv("SAIDECAR_CODEX_COMMAND", "SCRATCH_AI_CODEX_COMMAND") || "codex",
   codexTimeoutMs: Number.parseInt(
-    process.env.SCRATCH_AI_CODEX_TIMEOUT_MS || "120000",
+    pickEnv("SAIDECAR_CODEX_TIMEOUT_MS", "SCRATCH_AI_CODEX_TIMEOUT_MS") || "120000",
     10
   ),
-  codexSearchModel: process.env.SCRATCH_AI_CODEX_SEARCH_MODEL,
+  codexSearchModel: pickEnv("SAIDECAR_CODEX_SEARCH_MODEL", "SCRATCH_AI_CODEX_SEARCH_MODEL"),
   codexSearchBaseUrl:
-    process.env.SCRATCH_AI_CODEX_SEARCH_BASE_URL ||
+    pickEnv("SAIDECAR_CODEX_SEARCH_BASE_URL", "SCRATCH_AI_CODEX_SEARCH_BASE_URL") ||
     "https://chatgpt.com/backend-api",
   codexSearchContextSize:
-    process.env.SCRATCH_AI_CODEX_SEARCH_CONTEXT_SIZE || "medium",
-  logDir: expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"),
+    pickEnv("SAIDECAR_CODEX_SEARCH_CONTEXT_SIZE", "SCRATCH_AI_CODEX_SEARCH_CONTEXT_SIZE") ||
+    "medium",
+  logDir: expandHome(pickEnv("SAIDECAR_LOG_DIR", "SCRATCH_AI_LOG_DIR") || defaultLogDir),
   indexPath: expandHome(
-    process.env.SCRATCH_AI_INDEX_PATH ||
-      defaultIndexPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"))
+    pickEnv("SAIDECAR_INDEX_PATH", "SCRATCH_AI_INDEX_PATH") ||
+      defaultIndexPath(defaultLogDir)
   ),
   annotationDir: expandHome(
-    process.env.SCRATCH_AI_ANNOTATION_DIR ||
-      defaultBrainPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"), "annotations")
+    pickEnv("SAIDECAR_ANNOTATION_DIR", "SCRATCH_AI_ANNOTATION_DIR") ||
+      defaultSiblingPath(defaultLogDir, "annotations")
   ),
   sessionDir: expandHome(
-    process.env.SCRATCH_AI_SESSION_DIR ||
-      defaultBrainPath(expandHome(process.env.SCRATCH_AI_LOG_DIR || "~/dev-brain/inbox"), "sessions")
+    pickEnv("SAIDECAR_SESSION_DIR", "SCRATCH_AI_SESSION_DIR") ||
+      defaultSiblingPath(defaultLogDir, "sessions")
   ),
-  project: process.env.SCRATCH_AI_PROJECT || "general",
-  timezone: process.env.SCRATCH_AI_TIMEZONE || "Europe/Rome",
-  autoFilterEnabled: process.env.SCRATCH_AI_AUTO_FILTER === "true",
-  showThinking: process.env.SCRATCH_AI_SHOW_THINKING === "true",
-  weeklySummaryEnabled: process.env.SCRATCH_AI_WEEKLY_SUMMARY === "true",
-  weeklyAutoEnabled: process.env.SCRATCH_AI_WEEKLY_AUTO === "true",
+  project: pickEnv("SAIDECAR_PROJECT", "SCRATCH_AI_PROJECT") || "general",
+  timezone: pickEnv("SAIDECAR_TIMEZONE", "SCRATCH_AI_TIMEZONE") || "Europe/Rome",
+  autoFilterEnabled:
+    pickEnv("SAIDECAR_AUTO_FILTER", "SCRATCH_AI_AUTO_FILTER") === "true",
+  showThinking:
+    pickEnv("SAIDECAR_SHOW_THINKING", "SCRATCH_AI_SHOW_THINKING") === "true",
+  weeklySummaryEnabled:
+    pickEnv("SAIDECAR_WEEKLY_SUMMARY", "SCRATCH_AI_WEEKLY_SUMMARY") === "true",
+  weeklyAutoEnabled:
+    pickEnv("SAIDECAR_WEEKLY_AUTO", "SCRATCH_AI_WEEKLY_AUTO") === "true",
 };
 
 import { PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_ANTHROPIC, PROVIDER_MINIMAX, KNOWN_PROVIDERS } from "./providers/index.js";
 
 export function validateConfig() {
   if (!["openai", "codex"].includes(config.backend)) {
-    throw new Error('SCRATCH_AI_BACKEND must be either "openai" or "codex".');
+    throw new Error('SCRATCH_AI_BACKEND or SAIDECAR_BACKEND must be either "openai" or "codex".');
   }
 
   if (!KNOWN_PROVIDERS.includes(config.provider)) {
     throw new Error(
-      `SCRATCH_AI_PROVIDER must be one of: ${KNOWN_PROVIDERS.join(", ")}.`
+      `SAIDECAR_PROVIDER (or SCRATCH_AI_PROVIDER) must be one of: ${KNOWN_PROVIDERS.join(", ")}.`
     );
   }
 
@@ -111,6 +153,6 @@ export function validateConfig() {
   }
 
   if (!Number.isFinite(config.codexTimeoutMs) || config.codexTimeoutMs < 1000) {
-    throw new Error("SCRATCH_AI_CODEX_TIMEOUT_MS must be at least 1000.");
+    throw new Error("SAIDECAR_CODEX_TIMEOUT_MS (or SCRATCH_AI_CODEX_TIMEOUT_MS) must be at least 1000.");
   }
 }

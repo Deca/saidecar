@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
-import { config } from "./config.js";
+import { config, APP_DISPLAY_NAME } from "./config.js";
 import { modes } from "./modes.js";
 import { systemPrompt } from "./prompt.js";
 import { formatSessionContext } from "./sessionContext.js";
@@ -78,7 +78,7 @@ function buildPrompt({ question, modeName, sessionContext = [] }) {
   return `${systemPrompt}
 
 Codex backend constraints:
-- You are running as a scratch Q&A sidecar, not as a coding agent.
+- You are running as a sAIdecar scratch Q&A sidecar, not as a coding agent.
 - Do not inspect the current repository.
 - Do not read local files.
 - Do not run shell commands.
@@ -87,7 +87,7 @@ Codex backend constraints:
 
 Mode: ${modeName}
 ${context ? `
-Recent Scratch AI session context:
+Recent ${APP_DISPLAY_NAME} session context:
 ${context}
 
 Use this recent context only when it helps answer the current question. If the current question is unrelated, ignore it.
@@ -199,7 +199,7 @@ export async function askCodex({ question, modeName, sessionContext = [] }) {
   const loginMs = Date.now() - startedAt;
 
   const mode = modes[modeName] || modes.normal;
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "scratch-ai-codex-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "saidecar-codex-"));
   const outputFile = path.join(tempDir, "answer.txt");
   const args = [
     "exec",
