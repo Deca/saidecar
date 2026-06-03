@@ -32,6 +32,7 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
     system: systemPrompt,
     messages: [{ role: "user", content: questionWithContext }],
     max_tokens: 4096,
+    ...(mode.tools?.length > 0 && { tools: mode.tools }),
   };
 
   const headers = {
