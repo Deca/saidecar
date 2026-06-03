@@ -95,6 +95,7 @@ export function buildChatRequest(provider, { model, systemPrompt, question, tool
       system: systemPrompt,
       messages: [{ role: "user", content: question }],
       max_tokens: 4096,
+      ...(tools && tools.length > 0 && { tools }),
       ...(reasoning && { thinking: { type: "enabled", budget_tokens: 12000 } }),
     };
   }

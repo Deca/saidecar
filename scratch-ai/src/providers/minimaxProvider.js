@@ -32,8 +32,30 @@ export async function askMinimaxProvider({ question, modeName, sessionContext = 
     system: systemPrompt,
     messages: [{ role: "user", content: questionWithContext }],
     max_tokens: 4096,
-    ...(mode.tools?.length > 0 && { tools: mode.tools }),
+    ...(mode.tools?.length > 0 && { tools: transformToolsForMinimax(mode.tools) }),
   };
+
+  function transformToolsForMinimax(tools) {
+    return tools.map((tool) => {
+      if (tool.type === "web_search") {
+        return {
+          name: "web_search",
+          description: "Search the web for current information",
+          input_schema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query",
+              },
+            },
+            required: ["query"],
+          },
+        };
+      }
+      return tool;
+    });
+  }
 
   const headers = {
     "Authorization": `Bearer ${credentials.access_token}`,
