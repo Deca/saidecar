@@ -1,6 +1,7 @@
 import { config } from "./config.js";
 import { askCodex } from "./codexClient.js";
 import { askCodexWebSearch } from "./codexWebSearchClient.js";
+import { askWebSearch } from "./webSearchClient.js";
 import { askOpenAIProvider } from "./providers/openaiProvider.js";
 import { askDeepSeekProvider } from "./providers/deepseekProvider.js";
 import { askAnthropicProvider } from "./providers/anthropicProvider.js";
@@ -35,6 +36,12 @@ export async function askModel({ question, modeName, sessionContext = [] }) {
 
     if (config.provider === PROVIDER_MINIMAX) {
       const result = await askMinimaxProvider({ question, modeName, sessionContext });
+      return { ...result, mode };
+    }
+
+    // Web search mode: use SearXNG-based web search
+    if (mode.tools.length > 0 && config.backend !== "codex") {
+      const result = await askWebSearch({ question, modeName, sessionContext });
       return { ...result, mode };
     }
   }
