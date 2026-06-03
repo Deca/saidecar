@@ -169,6 +169,9 @@ SCRATCH_AI_LOG_DIR=~/dev-brain/inbox
 SCRATCH_AI_INDEX_PATH=~/dev-brain/scratch-ai.sqlite
 SCRATCH_AI_PROJECT=general
 SCRATCH_AI_TIMEZONE=Europe/Rome
+
+# Auto-Filter (optional)
+SCRATCH_AI_AUTO_FILTER=true      # Enable LLM-based entry scoring
 ```
 
 ### Provider Setup
@@ -192,6 +195,25 @@ PROVIDER_API_KEY=sk-ant-...
 ```
 
 The model defaults are conservative examples. Override them if your account uses different model names.
+
+### Auto-Filter
+
+When `SCRATCH_AI_AUTO_FILTER=true`, each logged Q&A entry is scored by a lightweight model in the background. Scoring is **non-blocking** - it does not slow down your session.
+
+**Scoring categories:**
+- `keep` - Code snippets, references, decisions, complex explanations
+- `condense` - One-line summary saved instead of full conversation
+- `discard` - Trivial questions, chitchat, repeated queries
+
+The scoring uses the same provider configured via `SCRATCH_AI_PROVIDER`. Results are logged to the console for visibility:
+
+```
+[auto-filter] keep: how to use git rebase safely...
+[auto-filter] condense: what time is it
+[auto-filter] discard: hi
+```
+
+Manual saves via `/save` always force keep-as-is regardless of auto-filter decision.
 
 ## Codex OAuth Backend
 
