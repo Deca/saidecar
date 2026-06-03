@@ -106,23 +106,31 @@ User question: ${question}
 
 Please provide a helpful answer based on the search results above. Include relevant citations to the sources.`;
 
-    // If we have an active model provider, use it to synthesize the results
-    // Otherwise return the raw formatted results
-    const { modelClient } = await import("./modelClient.js");
-    const { modes } = await import("./modes.js");
+    // Use the provider directly to synthesize results (avoid circular import with modelClient)
+    const provider = config.provider || "openai";
 
-    const mode = modes.normal; // Use normal mode for synthesizing - no recursive web search
+    if (provider === "minimax") {
+      const { askMinimaxProvider } = await import("./providers/minimaxProvider.js");
+      const result = await askMinimaxProvider({ question: prompt, modeName: "normal", sessionContext: [] });
+      return { ...result, backend: "searxng" };
+    }
 
-    const result = await modelClient.askModel({
-      question: prompt,
-      modeName: "normal",
-      sessionContext: [],
-    });
+    if (provider === "deepseek") {
+      const { askDeepSeekProvider } = await import("./providers/deepseekProvider.js");
+      const result = await askDeepSeekProvider({ question: prompt, modeName: "normal", sessionContext: [] });
+      return { ...result, backend: "searxng" };
+    }
 
-    return {
-      ...result,
-      backend: "searxng",
-    };
+    if (provider === "anthropic") {
+      const { askAnthropicProvider } = await import("./providers/anthropicProvider.js");
+      const result = await askAnthropicProvider({ question: prompt, modeName: "normal", sessionContext: [] });
+      return { ...result, backend: "searxng" };
+    }
+
+    // Default: use OpenAI
+    const { askOpenAIProvider } = await import("./providers/openaiProvider.js");
+    const result = await askOpenAIProvider({ question: prompt, modeName: "normal", sessionContext: [] });
+    return { ...result, backend: "searxng" };
   } catch (error) {
     if (error instanceof WebSearchError) {
       throw error;
