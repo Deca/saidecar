@@ -252,6 +252,8 @@ export function searchEntries({
   importance = "all",
   decisionOnly = false,
   codeOnly = false,
+  since = null,
+  until = null,
   limit = 100,
   indexPath = config.indexPath,
   annotationDir = config.annotationDir,
@@ -312,6 +314,16 @@ export function searchEntries({
     if (dateCutoff) {
       where.push("timestamp >= $dateCutoff");
       params.$dateCutoff = dateCutoff;
+    }
+
+    if (since) {
+      where.push("timestamp >= $since");
+      params.$since = since;
+    }
+
+    if (until) {
+      where.push("timestamp <= $until");
+      params.$until = until;
     }
 
     const needsAnnotationFilter = saved || tag !== "all";
