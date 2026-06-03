@@ -25,13 +25,14 @@ export async function askModel({ question, modeName, sessionContext = [] }) {
     }
     if (config.provider === PROVIDER_MINIMAX && mode.tools.length > 0) {
       // MiniMax doesn't have a usable client-side web search API.
-      // If OpenAI key is available, route to OpenAI provider. Otherwise fall through
-      // to Codex backend which has working web search.
+      // If OpenAI key is available, route to OpenAI provider. Otherwise use SearXNG.
       if (config.apiKey || process.env.OPENAI_API_KEY) {
         const result = await askOpenAIProvider({ question, modeName, sessionContext });
         return { ...result, mode };
       }
-      // Fall through to Codex backend check below
+      // Use SearXNG-based web search
+      const result = await askWebSearch({ question, modeName, sessionContext });
+      return { ...result, mode };
     }
 
     if (config.provider === PROVIDER_MINIMAX) {
