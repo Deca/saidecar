@@ -1,0 +1,30 @@
+# Enforce LF line endings for text files; keep native for shell scripts on Windows.
+# See https://docs.github.com/en/get-started/getting-started-with-git/configuring-git-to-handle-line-endings
+
+# Default: LF for most text
+*               text=auto eol=lf
+
+# Shell / batch / PowerShell scripts preserve native endings so they run on the host.
+*.sh            text eol=lf
+*.bash          text eol=lf
+*.zsh           text eol=lf
+*.ps1           text eol=crlf
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# Windows-only Zellij layouts stay LF (layout files are not executed).
+*.kdl           text eol=lf
+
+# Explicit binary list
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.pdf           binary
+*.zip           binary
+*.gz            binary
+*.tar           binary
+*.docx          binary
+*.sqlite        binary
+*.sqlite-*      binary
