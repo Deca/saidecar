@@ -146,9 +146,13 @@ The bridge adapts the MIT-licensed approach used by `pi-codex-search`; see `THIR
 
 ```env
 # Provider selection
-SCRATCH_AI_PROVIDER=openai      # openai, deepseek, anthropic
+SCRATCH_AI_PROVIDER=openai      # openai, deepseek, anthropic, minimax
 PROVIDER_API_KEY=                # API key for third-party providers (deepseek, anthropic)
-PROVIDER_BASE_URL=               # Optional custom endpoint URL
+PROVIDER_BASE_URL=              # Optional custom endpoint URL
+
+# MiniMax OAuth (optional)
+MINIMAX_API_KEY=                 # API key if not using mmx CLI
+MINIMAX_BASE_URL=               # Optional (auto-detected from key prefix)
 
 # Backend
 SCRATCH_AI_BACKEND=openai        # openai or codex
@@ -193,6 +197,21 @@ PROVIDER_API_KEY=sk-...
 SCRATCH_AI_PROVIDER=anthropic
 PROVIDER_API_KEY=sk-ant-...
 ```
+
+**MiniMax** (requires `mmx-cli` for OAuth or API key):
+```env
+SCRATCH_AI_PROVIDER=minimax
+MINIMAX_API_KEY=sk-...          # Optional if using mmx OAuth
+MINIMAX_BASE_URL=              # Optional (auto-detected from key prefix)
+```
+
+To use MiniMax with OAuth authentication:
+```bash
+npm install -g mmx-cli
+mmx auth login
+```
+
+This will open a browser for sign-in. After authentication, scratch-ai will automatically detect and use the mmx credentials.
 
 The model defaults are conservative examples. Override them if your account uses different model names.
 

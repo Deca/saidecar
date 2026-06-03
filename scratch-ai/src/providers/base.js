@@ -1,12 +1,14 @@
 export const PROVIDER_OPENAI = "openai";
 export const PROVIDER_DEEPSEEK = "deepseek";
 export const PROVIDER_ANTHROPIC = "anthropic";
+export const PROVIDER_MINIMAX = "minimax";
 export const PROVIDER_CODEX = "codex";
 
 export const KNOWN_PROVIDERS = [
   PROVIDER_OPENAI,
   PROVIDER_DEEPSEEK,
   PROVIDER_ANTHROPIC,
+  PROVIDER_MINIMAX,
   PROVIDER_CODEX,
 ];
 
@@ -15,6 +17,7 @@ export function providerBaseUrl(provider) {
     [PROVIDER_OPENAI]: "https://api.openai.com/v1",
     [PROVIDER_DEEPSEEK]: "https://api.deepseek.com/v1",
     [PROVIDER_ANTHROPIC]: "https://api.anthropic.com/v1",
+    [PROVIDER_MINIMAX]: "https://api.minimaxi.com/anthropic/v1", // China domestic
   };
   return urls[provider] || null;
 }
@@ -24,6 +27,7 @@ export function providerModels(provider) {
     [PROVIDER_OPENAI]: ["gpt-4o-mini", "gpt-4o", "gpt-4.5"],
     [PROVIDER_DEEPSEEK]: ["deepseek-chat", "deepseek-coder"],
     [PROVIDER_ANTHROPIC]: ["claude-3-5-haiku", "claude-3-5-sonnet"],
+    [PROVIDER_MINIMAX]: ["MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5"],
   };
   return models[provider] || [];
 }
@@ -32,8 +36,12 @@ export function isOpenAICompatible(provider) {
   return [PROVIDER_OPENAI, PROVIDER_DEEPSEEK].includes(provider);
 }
 
+export function isAnthropicCompatible(provider) {
+  return [PROVIDER_ANTHROPIC, PROVIDER_MINIMAX].includes(provider);
+}
+
 export function needsSystemPrompt(provider) {
-  return provider === PROVIDER_ANTHROPIC;
+  return isAnthropicCompatible(provider);
 }
 
 export function buildHeaders(provider, apiKey) {
@@ -51,6 +59,11 @@ export function buildHeaders(provider, apiKey) {
       "Content-Type": "application/json",
       "anthropic-version": "2023-06-01",
     },
+    [PROVIDER_MINIMAX]: {
+      "x-api-key": apiKey,
+      "Content-Type": "application/json",
+      "anthropic-version": "2023-06-01",
+    },
   };
   return headers[provider] || {};
 }
@@ -64,7 +77,7 @@ export async function createProviderClient(provider, apiKey, baseUrl) {
     });
   }
 
-  if (provider === PROVIDER_ANTHROPIC) {
+  if (isAnthropicCompatible(provider)) {
     const { Anthropic } = await import("@anthropic-ai/sdk");
     return new Anthropic({
       apiKey,
@@ -76,13 +89,13 @@ export async function createProviderClient(provider, apiKey, baseUrl) {
 }
 
 export function buildChatRequest(provider, { model, systemPrompt, question, tools, reasoning }) {
-  if (provider === PROVIDER_ANTHROPIC) {
+  if (isAnthropicCompatible(provider)) {
     return {
       model,
       system: systemPrompt,
       messages: [{ role: "user", content: question }],
       max_tokens: 4096,
-      ...(reasoning && { reasoning_effort: reasoning }),
+      ...(reasoning && { thinking: { type: "enabled", budget_tokens: 12000 } }),
     };
   }
 
@@ -90,8 +103,7 @@ export function buildChatRequest(provider, { model, systemPrompt, question, tool
     model,
     messages: [
       ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-      { role: "user", content: question },
-    ],
+      { role: "user", content: question }],
   };
 
   if (tools && tools.length > 0) {
@@ -107,9 +119,17 @@ export function buildChatRequest(provider, { model, systemPrompt, question, tool
 }
 
 export async function parseProviderResponse(provider, response, backend) {
-  if (provider === PROVIDER_ANTHROPIC) {
+  if (isAnthropicCompatible(provider)) {
+    let text = "";
+    for (const block of response.content) {
+      if (block.type === "text") {
+        text += block.text;
+      } else if (block.type === "thinking") {
+        text += `<thinking>\n${block.thinking}\n</thinking>`;
+      }
+    }
     return {
-      answer: response.content[0].text,
+      answer: text,
       raw: response,
       usage: {
         inputTokens: response.usage.input_tokens,
@@ -136,5 +156,5 @@ export async function parseProviderResponse(provider, response, backend) {
 }
 
 export function providerRequiresTools(provider) {
-  return provider === PROVIDER_ANTHROPIC;
+  return isAnthropicCompatible(provider);
 }

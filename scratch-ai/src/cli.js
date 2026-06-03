@@ -7,6 +7,7 @@ import { config, validateConfig } from "./config.js";
 import { wrapText } from "./textUtils.js";
 import { appendLog, getLogFilePath, triggerAutoFilterAndWait } from "./logger.js";
 import { modes, parseInput } from "./modes.js";
+import { providerModels, providerBaseUrl } from "./providers/index.js";
 import { renderMarkdownForTerminal } from "./terminalMarkdown.js";
 import { annotateEntry } from "./annotations.js";
 import { formatDoctorChecks, runDoctorChecks } from "./doctor.js";
@@ -49,6 +50,8 @@ const session = {
   },
   contextEnabled: true,
   history: [],
+  currentModel: config.activeModel,
+  currentProvider: config.provider,
 };
 
 function estimateTokens(text) {
@@ -203,6 +206,8 @@ ${chalk.bold("Session commands")}
   /status
   /config
   /modes
+  /model [name|status]
+  /provider [name|status]
   /history
   /context [on|off|status]
   /save <history-index> [tag...]
@@ -275,8 +280,8 @@ function printIntro() {
   printSplash();
   keyValue("session", session.id, chalk.yellow);
   keyValue("backend", config.backend, chalk.yellow);
-  keyValue("model", config.defaultModel, chalk.yellow);
-  keyValue("think model", config.thinkModel, chalk.yellow);
+  keyValue("provider", config.provider, chalk.yellow);
+  keyValue("model", session.currentModel, chalk.green);
   keyValue("context", session.contextEnabled ? "session follow-ups on" : "stateless per request", chalk.yellow);
   keyValue("project", config.project, chalk.yellow);
   keyValue("logs", getLogFilePath(), ui.dim);
@@ -295,8 +300,8 @@ function printStatus() {
   keyValue("session", session.id, chalk.yellow);
   keyValue("uptime", formatDuration(uptimeMs), chalk.white);
   keyValue("backend", config.backend, chalk.yellow);
-  keyValue("model", config.defaultModel, chalk.yellow);
-  keyValue("think model", config.thinkModel, chalk.yellow);
+  keyValue("provider", session.currentProvider, chalk.yellow);
+  keyValue("model", session.currentModel, chalk.green);
   keyValue("context", session.contextEnabled ? "on" : "off", chalk.yellow);
   keyValue(
     "follow-up",
@@ -326,8 +331,8 @@ function printConfig() {
   console.log("");
   console.log(sectionTitle("Scratch AI config"));
   keyValue("backend", config.backend, chalk.yellow);
-  keyValue("model", config.defaultModel, chalk.yellow);
-  keyValue("think model", config.thinkModel, chalk.yellow);
+  keyValue("provider", config.provider, chalk.yellow);
+  keyValue("model", session.currentModel, chalk.green);
   keyValue("codex command", config.codexCommand, chalk.white);
   keyValue("codex timeout", `${config.codexTimeoutMs}ms`, chalk.white);
   keyValue("project", config.project, chalk.white);
@@ -335,6 +340,17 @@ function printConfig() {
   keyValue("context", `${DEFAULT_CONTEXT_EXCHANGES} exchanges, ~${estimateTokens("x".repeat(DEFAULT_CONTEXT_CHARS))} token budget`, chalk.white);
   keyValue("log file", getLogFilePath(), ui.dim);
   console.log("");
+
+  const availableModels = providerModels(config.provider);
+  if (availableModels.length > 0) {
+    console.log(sectionTitle("Available models"));
+    for (const m of availableModels) {
+      const marker = m === session.currentModel ? " →" : "  ";
+      console.log(`${chalk.white(marker)} ${m}`);
+    }
+    console.log("");
+  }
+  console.log(ui.dim("Use /model <name> to switch at runtime"));
 }
 
 function currentSessionContext() {
@@ -605,6 +621,52 @@ export async function runCli() {
 
         if (parsed.command === "config") {
           printConfig();
+          continue;
+        }
+
+        if (parsed.command === "model") {
+          if (parsed.action === "status") {
+            const availableModels = providerModels(session.currentProvider);
+            console.log("");
+            console.log(sectionTitle("Current model"));
+            keyValue("provider", session.currentProvider, chalk.yellow);
+            keyValue("model", session.currentModel, chalk.green);
+            console.log("");
+            if (availableModels.length > 0) {
+              console.log(sectionTitle("Available models"));
+              for (const m of availableModels) {
+                const marker = m === session.currentModel ? " →" : "  ";
+                console.log(`${chalk.white(marker)} ${m}`);
+              }
+              console.log("");
+              console.log(ui.dim(`Use /model <name> to switch (e.g. /model ${availableModels[0]})`));
+            }
+          } else if (parsed.model) {
+            const availableModels = providerModels(session.currentProvider);
+            if (availableModels.length > 0 && !availableModels.includes(parsed.model)) {
+              console.log(chalk.red(`Model '${parsed.model}' not available for provider '${session.currentProvider}'.`));
+              console.log(`Available: ${availableModels.join(", ")}`);
+            } else {
+              session.currentModel = parsed.model;
+              modes.normal.model = parsed.model;
+              modes.web.model = parsed.model;
+              console.log(chalk.green(`Model set to: ${parsed.model}`));
+            }
+          }
+          continue;
+        }
+
+        if (parsed.command === "provider") {
+          if (parsed.action === "status") {
+            console.log("");
+            console.log(sectionTitle("Current provider"));
+            keyValue("provider", session.currentProvider, chalk.yellow);
+            console.log("");
+          } else if (parsed.provider) {
+            session.currentProvider = parsed.provider;
+            console.log(chalk.green(`Provider set to: ${parsed.provider}`));
+            console.log(ui.dim("Restart app to use new provider"));
+          }
           continue;
         }
 

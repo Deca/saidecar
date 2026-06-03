@@ -3,7 +3,7 @@ import { config } from "./config.js";
 export const modes = {
   normal: {
     label: "normal",
-    model: config.defaultModel,
+    model: config.activeModel,
     reasoning: { effort: "none" },
     tools: [],
   },
@@ -15,7 +15,7 @@ export const modes = {
   },
   web: {
     label: "web",
-    model: config.defaultModel,
+    model: config.activeModel,
     reasoning: { effort: "low" },
     tools: [{ type: "web_search" }],
   },
@@ -60,6 +60,24 @@ export function parseInput(rawInput) {
 
   if (simpleCommands[input]) {
     return { type: "command", command: simpleCommands[input] };
+  }
+
+  if (input.startsWith("/model ")) {
+    const model = input.slice("/model ".length).trim();
+    return { type: "command", command: "model", model };
+  }
+
+  if (input === "/model") {
+    return { type: "command", command: "model", action: "status" };
+  }
+
+  if (input.startsWith("/provider ")) {
+    const provider = input.slice("/provider ".length).trim();
+    return { type: "command", command: "provider", provider };
+  }
+
+  if (input === "/provider") {
+    return { type: "command", command: "provider", action: "status" };
   }
 
   if (input === "/context") {

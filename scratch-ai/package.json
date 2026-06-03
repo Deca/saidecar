@@ -24,6 +24,7 @@
     "link": "npm link"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
     "ink": "^7.0.5",

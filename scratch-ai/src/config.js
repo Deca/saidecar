@@ -33,8 +33,11 @@ export const config = {
   provider: (process.env.SCRATCH_AI_PROVIDER || "openai").toLowerCase(),
   providerApiKey: process.env.PROVIDER_API_KEY,
   providerBaseUrl: process.env.PROVIDER_BASE_URL,
+  minimaxApiKey: process.env.MINIMAX_API_KEY,
+  minimaxBaseUrl: process.env.MINIMAX_BASE_URL,
+  minimaxAuthMode: process.env.MINIMAX_AUTH_MODE,
   backend: (process.env.SCRATCH_AI_BACKEND || "openai").toLowerCase(),
-  defaultModel: process.env.SCRATCH_AI_MODEL || "gpt-4o-mini",
+  activeModel: process.env.SCRATCH_AI_MODEL || "gpt-4o-mini",
   thinkModel:
     process.env.SCRATCH_AI_THINK_MODEL ||
     process.env.SCRATCH_AI_MODEL ||
@@ -68,7 +71,7 @@ export const config = {
   autoFilterEnabled: process.env.SCRATCH_AI_AUTO_FILTER === "true",
 };
 
-import { PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_ANTHROPIC, KNOWN_PROVIDERS } from "./providers/index.js";
+import { PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_ANTHROPIC, PROVIDER_MINIMAX, KNOWN_PROVIDERS } from "./providers/index.js";
 
 export function validateConfig() {
   if (!["openai", "codex"].includes(config.backend)) {
@@ -97,6 +100,11 @@ export function validateConfig() {
     throw new Error(
       "Missing ANTHROPIC_API_KEY (via PROVIDER_API_KEY). Add it to your environment or create .env from .env.example."
     );
+  }
+
+  if (config.provider === PROVIDER_MINIMAX) {
+    // Skip validation - auth will be handled by MinimaxAuth class
+    // which checks multiple sources: env var, mmx config, mmx CLI status
   }
 
   if (!Number.isFinite(config.codexTimeoutMs) || config.codexTimeoutMs < 1000) {

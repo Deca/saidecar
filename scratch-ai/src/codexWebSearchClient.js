@@ -110,9 +110,9 @@ async function resolveSearchModel(auth, signal) {
 
   try {
     const models = await fetchCodexModels({ ...auth, signal });
-    return (models.find((model) => model.isDefault) || models[0])?.id || config.defaultModel;
+    return (models.find((model) => model.isDefault) || models[0])?.id || config.activeModel;
   } catch {
-    return config.defaultModel;
+    return config.activeModel;
   }
 }
 
