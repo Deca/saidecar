@@ -1,8 +1,10 @@
-# Scratch AI
+# sAIdecar
 
-A lightweight terminal AI sidecar for quick developer questions inside Zellij.
+> A lightweight terminal AI sidecar for quick developer questions inside Zellij. (Read the name as a mashup of **s**idecar + **AI**.)
 
 It is intentionally not a coding agent. In direct OpenAI mode it does not scan repositories, read local files, run shell commands, or modify project files. In Codex mode it delegates the model call to `codex exec` so you can use Codex's Sign in with ChatGPT flow, while constraining Codex to an ephemeral read-only run outside the project directory.
+
+`npm link` installs five commands: `saidecar`, `saidecar-logs`, `saidecar-digest`, `saidecar-doctor`, and `saidecar-zellij`. The package is unreleased, so there are no legacy `scratch-*` names to preserve.
 
 ## Features
 
@@ -31,33 +33,65 @@ cp .env.example .env
 npm link
 ```
 
-Edit `.env` and choose `SCRATCH_AI_BACKEND=codex` or `SCRATCH_AI_BACKEND=openai`. Codex mode uses `codex login`; OpenAI mode requires `OPENAI_API_KEY`.
+Edit `.env` and choose `SAIDECAR_BACKEND=codex` or `SAIDECAR_BACKEND=openai` (the legacy `SCRATCH_AI_BACKEND` name is also accepted). Codex mode uses `codex login`; OpenAI mode requires `OPENAI_API_KEY`.
 
 ## Usage
 
 ```bash
-scratch-ai
+saidecar
+saidecar-logs
+saidecar-digest
+saidecar-doctor
+saidecar-zellij
 ```
 
 Open the log explorer directly:
 
 ```bash
-scratch-logs
+saidecar-logs
 ```
 
 Run environment checks:
 
 ```bash
-scratch-doctor
-scratch-ai doctor
+saidecar-doctor
+saidecar doctor
 ```
 
 Generate a local Markdown review:
 
 ```bash
-scratch-digest
-scratch-digest --saved-only --write
+saidecar-digest
+saidecar-digest --saved-only --write
 ```
+
+For local development:
+
+```bash
+npm start
+```
+
+## Naming and storage
+
+The CLI displays the brand as **sAIdecar** and uses the new storage layout by default:
+
+| Concern | New default | Legacy location (auto-detected) |
+|---------|-------------|---------------------------------|
+| JSONL log directory | `~/.saidecar/logs/` | `~/dev-brain/inbox/` (kept if present) |
+| SQLite FTS index | `~/.saidecar/saidecar.sqlite` | `~/dev-brain/scratch-ai.sqlite` (kept) |
+| Annotations (favorites/tags) | `~/.saidecar/annotations/` | `~/dev-brain/annotations/` |
+| Digest reviews (Markdown) | `~/.saidecar/sessions/` | `~/dev-brain/sessions/` |
+| Env var prefix | `SAIDECAR_*` | `SCRATCH_AI_*` (still accepted) |
+| Command name | `saidecar` (+ `saidecar-logs`, `saidecar-digest`, `saidecar-doctor`, `saidecar-zellij`) | n/a |
+
+Resolution rules:
+
+1. If `SAIDECAR_LOG_DIR` is set, it wins.
+2. Else if `SCRATCH_AI_LOG_DIR` is set, it wins.
+3. Else if `~/dev-brain/inbox/` already exists (from a prior install), it is reused — **no data loss**.
+4. Else the new default `~/.saidecar/logs/` is used.
+
+The SQLite index filename follows the log directory: legacy `dev-brain/inbox` keeps the existing `scratch-ai.sqlite` file; new installs get `saidecar.sqlite`. This means existing users do not need to reindex.
 
 For local development:
 
@@ -93,7 +127,7 @@ Normal input without a slash is treated as a fast question.
 
 ## Terminal Presentation
 
-On startup, `scratch-ai` prints a Sidecar AI splash before the session metadata. The splash uses a block-letter logo with warm vintage color bands on `S` and `DECAR`, a grey gradient on `AI`, and the tagline:
+On startup, `saidecar` prints a Sidecar AI splash before the session metadata. The splash uses a block-letter logo with warm vintage color bands on `S` and `DECAR`, a grey gradient on `AI`, and the tagline:
 
 ```text
 extra thinking room without taking the handlebars
@@ -103,7 +137,7 @@ Agent answers are rendered with terminal-friendly markdown styling. Headings, li
 
 ## Session Context
 
-Scratch AI includes recent turns from the current terminal session by default so short follow-up questions work naturally.
+sAIdecar includes recent turns from the current terminal session by default so short follow-up questions work naturally.
 
 ```text
 /context
@@ -142,15 +176,17 @@ Logs remain append-only. Resetting a session does not remove JSONL entries, SQLi
 | web | `/web`, `/w` | yes | low |
 | deepweb | `/deepweb`, `/dw` | yes | medium |
 
-With `SCRATCH_AI_BACKEND=codex`, `/web` and `/deepweb` use the local Codex OAuth web-search bridge. It reads `~/.codex/auth.json`, calls the ChatGPT Codex search endpoint, and returns cited answers when the endpoint provides citations.
+With `SAIDECAR_BACKEND=codex` (legacy: `SCRATCH_AI_BACKEND=codex`), `/web` and `/deepweb` use the local Codex OAuth web-search bridge. It reads `~/.codex/auth.json`, calls the ChatGPT Codex search endpoint, and returns cited answers when the endpoint provides citations.
 
 The bridge adapts the MIT-licensed approach used by `pi-codex-search`; see `THIRD_PARTY_NOTICES.md`.
 
 ## Configuration
 
+The full env-var reference lives in `.env.example`. The new prefix is `SAIDECAR_*`; the legacy `SCRATCH_AI_*` names are still honored for backward compatibility (the `SAIDECAR_*` value wins if both are set).
+
 ```env
 # Provider selection
-SCRATCH_AI_PROVIDER=openai      # openai, deepseek, anthropic, minimax
+SAIDECAR_PROVIDER=openai      # openai, deepseek, anthropic, minimax
 PROVIDER_API_KEY=                # API key for third-party providers (deepseek, anthropic)
 PROVIDER_BASE_URL=              # Optional custom endpoint URL
 
@@ -160,30 +196,32 @@ MINIMAX_BASE_URL=               # Optional (auto-detected from key prefix)
 MINIMAX_AUTH_MODE=oauth         # "oauth" (default) or "api_key"
 
 # Backend
-SCRATCH_AI_BACKEND=openai        # openai or codex
+SAIDECAR_BACKEND=openai        # openai or codex
 
-# OpenAI (when SCRATCH_AI_PROVIDER=openai)
+# OpenAI (when SAIDECAR_PROVIDER=openai)
 OPENAI_API_KEY=
 
 # Models
-SCRATCH_AI_MODEL=gpt-5.4-mini
-SCRATCH_AI_THINK_MODEL=gpt-5.4-mini
+SAIDECAR_MODEL=gpt-5.4-mini
+SAIDECAR_THINK_MODEL=gpt-5.4-mini
 
 # Thinking display (for models like MiniMax-M3 that output thinking)
-SCRATCH_AI_SHOW_THINKING=false    # true to show thinking blocks, false to hide (default: false)
+SAIDECAR_SHOW_THINKING=false    # true to show thinking blocks, false to hide (default: false)
 
 # Codex
-SCRATCH_AI_CODEX_COMMAND=codex
-SCRATCH_AI_CODEX_TIMEOUT_MS=120000
+SAIDECAR_CODEX_COMMAND=codex
+SAIDECAR_CODEX_TIMEOUT_MS=120000
 
 # Storage
-SCRATCH_AI_LOG_DIR=~/dev-brain/inbox
-SCRATCH_AI_INDEX_PATH=~/dev-brain/scratch-ai.sqlite
-SCRATCH_AI_PROJECT=general
-SCRATCH_AI_TIMEZONE=Europe/Rome
+# Defaults: ~/.saidecar/logs + ~/.saidecar/saidecar.sqlite
+# Legacy (auto-detected when present): ~/dev-brain/inbox + ~/dev-brain/scratch-ai.sqlite
+#SAIDECAR_LOG_DIR=~/.saidecar/logs
+#SAIDECAR_INDEX_PATH=~/.saidecar/saidecar.sqlite
+SAIDECAR_PROJECT=general
+SAIDECAR_TIMEZONE=Europe/Rome
 
 # Auto-Filter (optional)
-SCRATCH_AI_AUTO_FILTER=true      # Enable LLM-based entry scoring
+SAIDECAR_AUTO_FILTER=true      # Enable LLM-based entry scoring
 
 # Web Search (SearXNG, self-hosted)
 SEARXNG_URL=http://localhost:8080   # Default SearXNG instance URL
@@ -212,31 +250,31 @@ SEARXNG_ENGINES=bing,mojeek,presearch,wikipedia
 
 The default engines (google, duckduckgo, brave) are commonly rate-limited. We pin to engines that actually respond. You can customize via `SEARXNG_ENGINES`.
 
-Run `scratch-doctor` to verify SearXNG is reachable.
+Run `saidecar-doctor` to verify SearXNG is reachable.
 
 ### Provider Setup
 
 **OpenAI** (default):
 ```env
-SCRATCH_AI_PROVIDER=openai
+SAIDECAR_PROVIDER=openai
 OPENAI_API_KEY=your_openai_api_key
 ```
 
 **DeepSeek** (affordable OpenAI-compatible):
 ```env
-SCRATCH_AI_PROVIDER=deepseek
+SAIDECAR_PROVIDER=deepseek
 PROVIDER_API_KEY=sk-...
 ```
 
 **Anthropic Claude**:
 ```env
-SCRATCH_AI_PROVIDER=anthropic
+SAIDECAR_PROVIDER=anthropic
 PROVIDER_API_KEY=sk-ant-...
 ```
 
 **MiniMax** (requires `mmx-cli` for OAuth or API key):
 ```env
-SCRATCH_AI_PROVIDER=minimax
+SAIDECAR_PROVIDER=minimax
 MINIMAX_API_KEY=sk-...          # Optional if using mmx OAuth
 MINIMAX_BASE_URL=              # Optional (auto-detected from key prefix)
 ```
@@ -247,20 +285,20 @@ npm install -g mmx-cli
 mmx auth login
 ```
 
-This will open a browser for sign-in. After authentication, scratch-ai will automatically detect and use the mmx credentials.
+This will open a browser for sign-in. After authentication, sAIdecar will automatically detect and use the mmx credentials.
 
 The model defaults are conservative examples. Override them if your account uses different model names.
 
 ### Auto-Filter
 
-When `SCRATCH_AI_AUTO_FILTER=true`, each logged Q&A entry is scored by a lightweight model in the background. Scoring is **non-blocking** - it does not slow down your session.
+When `SAIDECAR_AUTO_FILTER=true`, each logged Q&A entry is scored by a lightweight model in the background. Scoring is **non-blocking** - it does not slow down your session.
 
 **Scoring categories:**
 - `keep` - Code snippets, references, decisions, complex explanations
 - `condense` - One-line summary saved instead of full conversation
 - `discard` - Trivial questions, chitchat, repeated queries
 
-The scoring uses the same provider configured via `SCRATCH_AI_PROVIDER`. Results are logged to the console for visibility:
+The scoring uses the same provider configured via `SAIDECAR_PROVIDER`. Results are logged to the console for visibility:
 
 ```
 [auto-filter] keep: how to use git rebase safely...
@@ -281,7 +319,7 @@ codex login
 Choose **Sign in with ChatGPT**, then set:
 
 ```env
-SCRATCH_AI_BACKEND=codex
+SAIDECAR_BACKEND=codex
 OPENAI_API_KEY=
 ```
 
@@ -306,22 +344,22 @@ npm link
 Daily command from any directory:
 
 ```bash
-scratch-zellij
+saidecar-zellij
 ```
 
-This creates or attaches a persistent `scratch-ai` Zellij session using `layouts/scratch-ai.kdl`. The default session opens two panes: `scratch-ai` on the left and `scratch-logs` on the right.
+This creates or attaches a persistent `saidecar` Zellij session using `layouts/saidecar.kdl`. The default session opens two panes: `saidecar` on the left and `saidecar-logs` on the right.
 
 Dev layout from any directory:
 
 ```bash
-scratch-zellij dev dev-with-scratch.kdl
+saidecar-zellij dev dev-with-saidecar.kdl
 ```
 
 Direct CLIs from anywhere:
 
 ```bash
-scratch-ai
-scratch-logs
+saidecar
+saidecar-logs
 ```
 
 You can also run through npm from this repo.
@@ -332,7 +370,7 @@ Recommended daily command:
 npm run zellij:session
 ```
 
-This creates or attaches a persistent `scratch-ai` Zellij session using `layouts/scratch-ai.kdl`.
+This creates or attaches a persistent `saidecar` Zellij session using `layouts/saidecar.kdl`.
 
 From inside an existing Zellij session:
 
@@ -340,9 +378,9 @@ From inside an existing Zellij session:
 npm run zellij:pane
 ```
 
-This is only a best-effort helper for adding Scratch AI to the current session. The layout session above is the more reliable daily workflow.
+This is only a best-effort helper for adding sAIdecar to the current session. The layout session above is the more reliable daily workflow.
 
-From outside Zellij, start or attach to the dedicated Scratch AI session:
+From outside Zellij, start or attach to the dedicated sAIdecar session:
 
 ```bash
 npm run zellij:session
@@ -365,23 +403,23 @@ For everyday use, add one of these aliases to your shell profile.
 PowerShell:
 
 ```powershell
-function zai { & "C:\path\to\ai-sidecar\scratch-ai\scripts\zai.ps1" }
+function zai { & "<path-to-repo>\scratch-ai\scripts\zai.ps1" }
 ```
 
 Bash:
 
 ```bash
-alias zai='/path/to/ai-sidecar/scratch-ai/scripts/zai.sh'
+alias zai='<path-to-repo>/scratch-ai/scripts/zai.sh'
 ```
 
 There are two ready-made layouts:
 
 ```text
-layouts/scratch-ai.kdl
-layouts/dev-with-scratch.kdl
+layouts/saidecar.kdl
+layouts/dev-with-saidecar.kdl
 ```
 
-`scratch-ai.kdl` is the permanent two-pane sidecar session. `dev-with-scratch.kdl` is a starter dev layout with a normal shell plus a suspended Scratch AI pane.
+`saidecar.kdl` is the permanent two-pane sidecar session. `dev-with-saidecar.kdl` is a starter dev layout with a normal shell plus a suspended sAIdecar pane.
 
 Run the sidecar session:
 
@@ -398,16 +436,18 @@ npm run zellij:dev
 Raw Zellij equivalent:
 
 ```bash
-zellij --session dev --new-session-with-layout ./layouts/dev-with-scratch.kdl
+zellij --session dev --new-session-with-layout ./layouts/dev-with-saidecar.kdl
 ```
 
 ## Logs
 
-Successful answers are appended to a daily JSONL file:
+Successful answers are appended to a daily JSONL file under `SAIDECAR_LOG_DIR`. The default location on a new install is:
 
 ```text
-~/dev-brain/inbox/YYYY-MM-DD.jsonl
+~/.saidecar/logs/YYYY-MM-DD.jsonl
 ```
+
+On a legacy install that already had `~/dev-brain/inbox/`, that directory is reused transparently (no data move). See [Naming and storage](#naming-and-storage) for the resolution rules.
 
 Example line:
 
@@ -419,26 +459,26 @@ Errors are also logged when possible so the CLI can keep running.
 
 ## Log Explorer
 
-`scratch-logs` is a read-only TUI for reviewing the JSONL archive. JSONL stays canonical; the explorer rebuilds or refreshes a local SQLite FTS5 index on startup.
+`saidecar-logs` is a read-only TUI for reviewing the JSONL archive. JSONL stays canonical; the explorer rebuilds or refreshes a local SQLite FTS5 index on startup.
 
 ```bash
-scratch-logs
-scratch-logs --query "sqlite fts" --limit 5
-scratch-logs --query "sqlite fts" --format markdown
-scratch-logs --date today --format markdown
-scratch-logs --saved --tag laravel --format markdown
+saidecar-logs
+saidecar-logs --query "sqlite fts" --limit 5
+saidecar-logs --query "sqlite fts" --format markdown
+saidecar-logs --date today --format markdown
+saidecar-logs --saved --tag laravel --format markdown
 ```
 
 Environment:
 
 ```env
-SCRATCH_AI_LOG_DIR=~/dev-brain/inbox
-SCRATCH_AI_INDEX_PATH=~/dev-brain/scratch-ai.sqlite
-SCRATCH_AI_ANNOTATION_DIR=~/dev-brain/annotations
-SCRATCH_AI_SESSION_DIR=~/dev-brain/sessions
+SAIDECAR_LOG_DIR=~/.saidecar/logs
+SAIDECAR_INDEX_PATH=~/.saidecar/saidecar.sqlite
+SAIDECAR_ANNOTATION_DIR=~/.saidecar/annotations
+SAIDECAR_SESSION_DIR=~/.saidecar/sessions
 ```
 
-If `SCRATCH_AI_INDEX_PATH` is unset, it defaults to `scratch-ai.sqlite` next to the log directory parent. For the default log directory, that is `~/dev-brain/scratch-ai.sqlite`.
+If `SAIDECAR_INDEX_PATH` is unset, it defaults to `saidecar.sqlite` next to the log directory parent. For the default log directory, that is `~/.saidecar/saidecar.sqlite`. On legacy installs that reused `~/dev-brain/inbox/`, the existing `~/dev-brain/scratch-ai.sqlite` is kept untouched. See [Naming and storage](#naming-and-storage) for the full resolution rules.
 
 Keys:
 
@@ -465,22 +505,24 @@ Each result row also shows a code indicator (`<>`) and an importance badge (`!!`
 
 ## Index Architecture
 
-JSONL files are the canonical log. SQLite FTS5 is a **derived search index** - it is built on first query and incrementally updated when files change. You can delete `scratch-ai.sqlite` at any time; it rebuilds automatically from the JSONL archive.
+JSONL files are the canonical log. SQLite FTS5 is a **derived search index** - it is built on first query and incrementally updated when files change. You can delete the index file at any time; it rebuilds automatically from the JSONL archive.
 
 | File | Purpose | Lifespan |
 |------|---------|----------|
 | `YYYY-MM-DD.jsonl` | Canonical log | Append-only, permanent |
-| `scratch-ai.sqlite` | Search index (FTS5 + structured fields: decision, code, language, topic, importance) | Rebuildable cache |
+| `saidecar.sqlite` (new) or `scratch-ai.sqlite` (legacy) | Search index (FTS5 + structured fields: decision, code, language, topic, importance) | Rebuildable cache |
 | `annotations/*.jsonl` | Favorites/tags | Append-only |
 
-The index auto-refreshes when you run `scratch-logs` or `scratch-digest`. Press `r` in the log explorer to force a manual reindex.
+The index auto-refreshes when you run `saidecar-logs` or `saidecar-digest`. Press `r` in the log explorer to force a manual reindex.
 
 ## Saved Entries And Tags
 
-Raw Q&A logs stay append-only under `SCRATCH_AI_LOG_DIR`. Favorites, tags, and notes are stored separately as append-only JSONL under:
+Raw Q&A logs stay append-only under `SAIDECAR_LOG_DIR` (legacy: `SCRATCH_AI_LOG_DIR`). Favorites, tags, and notes are stored separately as append-only JSONL under:
 
 ```text
-~/dev-brain/annotations/YYYY-MM-DD.jsonl
+~/.saidecar/annotations/YYYY-MM-DD.jsonl   # new default
+# or
+~/dev-brain/annotations/YYYY-MM-DD.jsonl   # legacy default
 ```
 
 From the active CLI session, use `/history` to find a recent question index, then:
@@ -490,25 +532,27 @@ From the active CLI session, use `/history` to find a recent question index, the
 /tag 3 ops
 ```
 
-In `scratch-logs`, press `f` to favorite the selected entry.
+In `saidecar-logs`, press `f` to favorite the selected entry.
 
 ## Digest
 
-`scratch-digest` creates an explicit local review of a day of Scratch AI logs. It is deterministic and local-first; it does not call a model.
+`saidecar-digest` creates an explicit local review of a day of sAIdecar logs. It is deterministic and local-first; it does not call a model.
 
 ```bash
-scratch-digest
-scratch-digest --date 2026-06-01
-scratch-digest --saved-only
-scratch-digest --write
-scratch-digest --dry-run
+saidecar-digest
+saidecar-digest --date 2026-06-01
+saidecar-digest --saved-only
+saidecar-digest --write
+saidecar-digest --dry-run
 ```
 
-With `--write`, Markdown is saved under:
+With `--write`, Markdown is saved under `SAIDECAR_SESSION_DIR`. On a new install that resolves to:
 
 ```text
-~/dev-brain/sessions/YYYY-MM-DD.md
+~/.saidecar/sessions/YYYY-MM-DD.md
 ```
+
+A legacy install that already had `~/dev-brain/sessions/` continues to use that directory.
 
 The digest surfaces structured fields extracted by the index:
 
@@ -518,18 +562,18 @@ The digest surfaces structured fields extracted by the index:
 
 ### Weekly Digest
 
-`scratch-digest --weekly` renders a Mon-Sun digest (ISO weeks) covering the current week by default. Output is **rule-based and deterministic** — the same input always produces the same report.
+`saidecar-digest --weekly` renders a Mon-Sun digest (ISO weeks) covering the current week by default. Output is **rule-based and deterministic** — the same input always produces the same report.
 
 ```bash
-scratch-digest --weekly
-scratch-digest --weekly --project iron-anchor
-scratch-digest --weekly --week-of 2026-06-03          # pick a week by any date in it
-scratch-digest --weekly --weeks-ago 1                 # previous week
-scratch-digest --weekly --write                       # save to weekly-YYYY-Www.md
-scratch-digest --weekly --summary                     # add an LLM narrative
+saidecar-digest --weekly
+saidecar-digest --weekly --project iron-anchor
+saidecar-digest --weekly --week-of 2026-06-03          # pick a week by any date in it
+saidecar-digest --weekly --weeks-ago 1                 # previous week
+saidecar-digest --weekly --write                       # save to weekly-YYYY-Www.md
+saidecar-digest --weekly --summary                     # add an LLM narrative
 ```
 
-With `--write`, the file is saved under `SCRATCH_AI_SESSION_DIR` as:
+With `--write`, the file is saved under `SAIDECAR_SESSION_DIR` (legacy: `SCRATCH_AI_SESSION_DIR`) as:
 
 ```text
 weekly-2026-W23.md
@@ -547,11 +591,11 @@ The weekly report includes:
 
 #### Optional LLM summary
 
-Pass `--summary` (or set `SCRATCH_AI_WEEKLY_SUMMARY=true` in `.env`) to prepend a 3-5 bullet narrative generated by the active LLM provider. The deterministic body is always built first, so the summary is just decoration and can never block or replace the report. If the LLM call fails, the digest is still printed without a summary.
+Pass `--summary` (or set `SAIDECAR_WEEKLY_SUMMARY=true` in `.env`) to prepend a 3-5 bullet narrative generated by the active LLM provider. The deterministic body is always built first, so the summary is just decoration and can never block or replace the report. If the LLM call fails, the digest is still printed without a summary.
 
 #### Optional startup auto-prompt
 
-Set `SCRATCH_AI_WEEKLY_AUTO=true` to have `scratch-digest` check the most recent weekly on startup. The rule is simple: **a weekly is fresh only if it covers the current ISO week**; anything older (including last week) is stale.
+Set `SAIDECAR_WEEKLY_AUTO=true` to have `saidecar-digest` check the most recent weekly on startup. The rule is simple: **a weekly is fresh only if it covers the current ISO week**; anything older (including last week) is stale.
 
 - **Interactive TTY** → prompts: `Last weekly digest: 2026-W22 (5 days ago). Generate 2026-W23 now? [Y/n]`. Press `n` (or just hit Enter — `Y` is the default) to skip.
 - **Non-interactive (CI/cron/redirected)** → prints a one-liner with the pending week and exits. Pass `--yes` to auto-generate without prompting.
@@ -561,13 +605,13 @@ The check is skipped automatically for `--weekly` (you're already generating), `
 
 ```bash
 # Interactive
-SCRATCH_AI_WEEKLY_AUTO=true scratch-digest
+SAIDECAR_WEEKLY_AUTO=true saidecar-digest
 
 # Cron / Task Scheduler — auto-yes
-SCRATCH_AI_WEEKLY_AUTO=true scratch-digest --yes
+SAIDECAR_WEEKLY_AUTO=true saidecar-digest --yes
 
 # Skip the check for one run
-scratch-digest --no-weekly-check
+saidecar-digest --no-weekly-check
 ```
 
 ## Structured Indexing
@@ -582,11 +626,16 @@ Every entry is enriched with five structured fields at index time, so you can fi
 | `topic` | string | `Topic:` prefix, first `#hashtag` in the question, or the project name |
 | `importance` | `low` / `medium` / `high` | Scored from decision + code + sources + length |
 
-These are **rule-based and deterministic** — no LLM calls, no extra cost, works on every entry including old ones. Fields are recomputed on every `refreshIndex()`, so you can simply delete `scratch-ai.sqlite*` to force a full backfill:
+These are **rule-based and deterministic** — no LLM calls, no extra cost, works on every entry including old ones. Fields are recomputed on every `refreshIndex()`, so you can simply delete the index file to force a full backfill:
 
 ```bash
+# New default
+rm -f ~/.saidecar/saidecar.sqlite*
+node ./bin/saidecar-logs.js
+
+# Legacy default (~/dev-brain/inbox from a prior install)
 rm -f ~/dev-brain/scratch-ai.sqlite*
-node ./bin/scratch-logs.js
+node ./bin/saidecar-logs.js
 ```
 
 The SQLite schema is auto-migrated: new columns (`is_decision`, `is_code_snippet`, `topic`, `language`, `importance`) and indexes are added on first open.
@@ -609,11 +658,11 @@ See `src/structuredExtract.js` for the extraction rules and `src/logIndex.js` fo
 
 ## Doctor
 
-`scratch-doctor` checks Node.js, `node:sqlite`, backend configuration, Codex auth file presence when `SCRATCH_AI_BACKEND=codex`, and writable log/index/annotation directories.
+`saidecar-doctor` checks Node.js, `node:sqlite`, backend configuration, Codex auth file presence when `SAIDECAR_BACKEND=codex` (legacy: `SCRATCH_AI_BACKEND=codex`), and writable log/index/annotation directories.
 
 ```bash
-scratch-doctor
-scratch-ai doctor
+saidecar-doctor
+saidecar doctor
 ```
 
 ## Validation
@@ -671,3 +720,11 @@ hello, what can you do?
 /deepweb current state of terminal AI agents for developers
 /exit
 ```
+
+## License
+
+Released under the [MIT License](../LICENSE). See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for upstream attributions.
+
+## Contributing
+
+Bug reports, fixes, and focused PRs are welcome. See [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow, testing, and commit conventions, and the `_documentation/CHANGELOGS/` directory for dated change notes.
