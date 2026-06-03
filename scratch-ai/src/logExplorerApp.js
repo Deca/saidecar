@@ -7,6 +7,7 @@ import { blockPatterns, stripInlineMarkdown } from "./markdownUtils.js";
 
 const h = React.createElement;
 const dateFilters = ["today", "7d", "30d", "all"];
+const importanceFilters = ["all", "high", "medium", "low"];
 const focusOrder = ["search", "list", "detail"];
 const RESERVED_LAYOUT_ROWS = 8;
 const palette = {
@@ -32,6 +33,8 @@ export function LogExplorerApp({ initialStats }) {
   const [dateIndex, setDateIndex] = useState(3);
   const [savedOnly, setSavedOnly] = useState(false);
   const [tagIndex, setTagIndex] = useState(0);
+  const [importanceIndex, setImportanceIndex] = useState(0);
+  const [codeOnly, setCodeOnly] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailOffset, setDetailOffset] = useState(0);
   const [focusIndex, setFocusIndex] = useState(0);
@@ -52,6 +55,7 @@ export function LogExplorerApp({ initialStats }) {
   const project = projectOptions[Math.min(projectIndex, projectOptions.length - 1)] || "all";
   const date = dateFilters[dateIndex] || "all";
   const tag = tagOptions[Math.min(tagIndex, tagOptions.length - 1)] || "all";
+  const importance = importanceFilters[Math.min(importanceIndex, importanceFilters.length - 1)] || "all";
 
   const entries = useMemo(
     () =>
@@ -63,9 +67,11 @@ export function LogExplorerApp({ initialStats }) {
         date,
         saved: savedOnly,
         tag,
+        importance,
+        codeOnly,
         limit: 200,
       }),
-    [query, mode, backend, project, date, savedOnly, tag]
+    [query, mode, backend, project, date, savedOnly, tag, importance, codeOnly]
   );
   const selected = entries[selectedIndex] || entries[0];
   const focus = focusOrder[focusIndex] || "search";
@@ -168,6 +174,18 @@ export function LogExplorerApp({ initialStats }) {
       return;
     }
 
+    if (input === "i") {
+      setImportanceIndex((value) => (value + 1) % importanceFilters.length);
+      setSelectedIndex(0);
+      return;
+    }
+
+    if (input === "n") {
+      setCodeOnly((value) => !value);
+      setSelectedIndex(0);
+      return;
+    }
+
     if (input === "f" && selected) {
       annotateEntry(selected, { favorite: true });
       setOptions(getFilterOptions());
@@ -187,7 +205,7 @@ export function LogExplorerApp({ initialStats }) {
   return h(
     Box,
     { flexDirection: "column" },
-    h(Header, { query, mode, backend, project, date, savedOnly, tag, focus, stats }),
+    h(Header, { query, mode, backend, project, date, savedOnly, tag, importance, codeOnly, focus, stats }),
     h(
       Box,
       { flexDirection: "row", flexGrow: 1 },
@@ -198,7 +216,7 @@ export function LogExplorerApp({ initialStats }) {
   );
 }
 
-function Header({ query, mode, backend, project, date, savedOnly, tag, focus, stats }) {
+function Header({ query, mode, backend, project, date, savedOnly, tag, importance, codeOnly, focus, stats }) {
   return h(
     Box,
     { flexDirection: "column", marginBottom: 1 },
@@ -208,7 +226,7 @@ function Header({ query, mode, backend, project, date, savedOnly, tag, focus, st
       null,
       h(Text, { color: focus === "search" ? palette.straw : palette.slate }, "search "),
       h(Text, null, query || "recent"),
-      h(Text, { color: palette.slate }, `  mode=${mode} backend=${backend} project=${project} date=${date} saved=${savedOnly ? "yes" : "no"} tag=${tag}`)
+      h(Text, { color: palette.slate }, `  mode=${mode} backend=${backend} project=${project} date=${date} saved=${savedOnly ? "yes" : "no"} tag=${tag} importance=${importance} code=${codeOnly ? "yes" : "no"}`)
     ),
     h(
       Text,
@@ -236,7 +254,7 @@ function ResultList({ entries, selectedIndex, focus, contentHeight, highlightTer
       const selected = index === selectedIndex;
       return renderHighlightedText({
         key: entry.id,
-        text: `${entry.favorite ? "*" : " "} ${entry.ref} ${formatDate(entry.timestamp)} [${entry.mode || "-"}] ${truncate(entry.question || "(no question)", 48)}`,
+        text: `${entry.favorite ? "*" : " "} ${entry.ref} ${formatDate(entry.timestamp)} [${entry.mode || "-"}]${entry.isCodeSnippet ? " <>" : "   "}${entry.importance ? importanceBadge(entry.importance) : "  "} ${truncate(entry.question || "(no question)", 44)}`,
         terms: highlightTerms,
         color: selected ? "black" : modeColorName(entry.mode),
         backgroundColor: selected ? palette.straw : undefined,
@@ -288,7 +306,7 @@ function Footer() {
     h(
       Text,
       { color: palette.slate },
-      "type search | up/down select | enter detail | tab focus | m/b/p/d filters | s saved | g tag | f favorite | r reindex | q quit"
+      "type search | up/down select | enter detail | tab focus | m/b/p/d filters | s saved | g tag | i importance | n code | f favorite | r reindex | q quit"
     )
   );
 }
@@ -500,6 +518,13 @@ function modeColorName(mode) {
   if (mode === "web") return palette.blue;
   if (mode === "deepweb") return palette.cyan;
   return palette.straw;
+}
+
+function importanceBadge(importance) {
+  if (importance === "high") return "!!";
+  if (importance === "medium") return "! ";
+  if (importance === "low") return "  ";
+  return "  ";
 }
 
 function formatDate(timestamp) {
