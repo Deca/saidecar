@@ -9,4 +9,7 @@ scratch-ai/*.sqlite
 scratch-ai/*.sqlite-*
 scratch-ai/research/
 .history/
+TODO.md
+ai-sidecar.code-workspace
+_documentation/
 
