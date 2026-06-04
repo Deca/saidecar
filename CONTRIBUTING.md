@@ -1,6 +1,6 @@
-# Contributing to Scratch AI Sidecar
+# Contributing to sAIdecar
 
-Thanks for your interest in contributing. Scratch AI is intentionally a small
+Thanks for your interest in contributing. sAIdecar is intentionally a small
 sidecar for quick developer Q&A inside a Zellij pane. The product is **not** a
 coding agent — please keep that scope in mind when proposing changes.
 
@@ -48,7 +48,7 @@ npm start
   exception; isolate them behind `src/modelClient.js` and `src/providers/`.
 - **No drive-by refactors.** If a refactor is needed to land a feature, split
   it into a separate commit or PR.
-- **Comments are sparse.** Add a comment only when the *why* is non-obvious.
+- **Comments are sparse.** Add a comment only when the _why_ is non-obvious.
   Do not restate the code.
 
 ## Testing
