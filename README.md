@@ -1,6 +1,6 @@
 # sAIdecar
 
-sAIdecar is a small terminal AI sidecar I built for my own daily workflow
+sAIdecar is a small terminal AI tool I built for my own daily workflow
 
 I wanted a fast scratchpad for the questions that come up while I am working but do not always belong in my main coding agent or flagship LLM session
 
